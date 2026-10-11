@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.7.0 — 2026-10-11
+
+- Add a dedicated VSIX adapter for Google's standalone Antigravity IDE. Keep host-specific DOM/conversation discovery separate from the shared renderer; narrow panes show three icons, wide panes expose values, and native controls retain their space.
+- Bind each input to its actual conversation and the IDE main language server, excluding desktop/autocomplete/other-profile sources. New or unrecognized conversations do not inherit another chat's samples.
+- Prefer response/message IDs when deduplicating model requests; execution IDs shared by tool follow-ups no longer collapse valid requests or lose cache reads.
+- Build fixed templates with DOM operations under existing Trusted Types policies. Avoid unchanged label/style/ARIA writes and max-height measurement oscillation so polling preserves card scroll, focus and open menus.
+- Retain theme, language, first-use guide and per-account/conversation aggregate history. Gate extension activation and install helpers to Antigravity IDE; use only fresh health records.
+- Add dependency-free VSIX packaging, SHA256 validation and an optional host-bundled-runtime install/launch/uninstall helper. Publish ZIP and IDE VSIX independently with checksums, after three-platform automated gates.
+- Include merged PR #7 by @qwqZYLqwq: 250ms cold hover, immediate warm transitions, 120ms leave grace, 350ms warm window, guarded delayed callbacks and 16 browser regressions with deterministic macOS startup timing.
+- Windows IDE 2.5.5 has real local acceptance. Linux/macOS IDE GUI acceptance remains open; other editor extensions and named/custom IDE profiles remain unsupported. Existing desktop screenshots are explicitly identified as desktop examples.
+
 ## 0.6.4 — 2026-10-10
 
 - Address [#6](https://github.com/YOU-SHOULD-KNOW-ME/antigrative-dashboard/issues/6): remove the duplicate toolbar language button; retain explicit English / 简体中文 choices at the bottom of context details. Add a compact bilingual first-use tip beside the context chip so users can find the setting despite the English default. Opening the tip locates and focuses the language choices without stealing focus on initial display.

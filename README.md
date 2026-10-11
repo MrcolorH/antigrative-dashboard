@@ -7,16 +7,16 @@
 Token throughput, cache hits and context usage in the model selector row. Hover over context for five-hour and weekly quotas too.<br>
 Keep the summary visible. Hover for the details.
 
-[![Version 0.6.4](https://img.shields.io/badge/version-0.6.4-91adff?style=flat-square&labelColor=252936)](CHANGELOG.md)
+[![Version 0.7.0](https://img.shields.io/badge/version-0.7.0-91adff?style=flat-square&labelColor=252936)](CHANGELOG.md)
 [![Platforms](https://img.shields.io/badge/host-Windows%20%7C%20Linux%20%7C%20macOS-83d8b9?style=flat-square&labelColor=252936)](COMPATIBILITY.md)
 [![Antigravity 2.21.1 / 2.22.0](https://img.shields.io/badge/Antigravity-2.21.1%20%2F%202.22.0-c5a0ff?style=flat-square&labelColor=252936)](COMPATIBILITY.md)
 [![MIT](https://img.shields.io/badge/license-MIT-d4d9e6?style=flat-square&labelColor=252936)](LICENSE)
 
-[Preview](#preview) · [CLI](#antigravity-cli-status-line) · [Install](#install) · [Enable or remove](#plug-and-unplug) · [Compatibility](#compatibility) · [FAQ](#faq) · [中文](README.zh-CN.md)
+[Preview](#preview) · [IDE](#antigravity-ide) · [CLI](#antigravity-cli-status-line) · [Install](#install) · [Enable or remove](#plug-and-unplug) · [Compatibility](#compatibility) · [FAQ](#faq) · [中文](README.zh-CN.md)
 
 </div>
 
-**v0.6.4:** Remove the duplicate toolbar language button and add a small bilingual first-use guide ([#6](https://github.com/YOU-SHOULD-KNOW-ME/antigrative-dashboard/issues/6)). English / 简体中文 choices remain at the bottom of context details. Narrow subagent composers now preserve native label and icon sizes, releasing plugin space when necessary. Includes the existing smooth responsive transitions. [Full release notes](https://github.com/YOU-SHOULD-KNOW-ME/antigrative-dashboard/releases/tag/v0.6.4).
+**v0.7.0:** Add a dedicated adapter for Google's standalone **Antigravity IDE**: three icons in a narrow Agent pane, numeric summaries when widened, real conversation statistics and stable hover cards. Includes PR #7's hover improvements. Other editor extensions remain unsupported. [Full release notes](https://github.com/YOU-SHOULD-KNOW-ME/antigrative-dashboard/releases/tag/v0.7.0).
 
 ## Preview
 
@@ -30,7 +30,7 @@ Keep the summary visible. Hover for the details.
 </tr>
 </table>
 
-<sub>Rendered from the current widget source with illustrative host layouts and data. Main and subagent samples use separate statistics; quotas are account-wide. The 44% context sample uses the latest request-start estimate, not cumulative input. The widget defaults to English; EN / 中 saves your choice.</sub>
+<sub>Desktop widget screenshots with illustrative host layouts and data; these are not IDE screenshots. Main and subagent samples use separate statistics; quotas are account-wide. The 44% context sample uses the latest request-start estimate, not cumulative input. Language choices are at the bottom of context details.</sub>
 
 **Keep working. The numbers are already there.**
 
@@ -56,6 +56,22 @@ Keep the summary visible. Hover for the details.
 - **Theme adaptation.** Controls, cards and quota menus follow Antigravity's light/dark mode and custom background, card, text and accent colors, with readable text and OS fallback in standalone previews. Live changes require no restart or conversation reload.
 - **Local collection.** The collector talks to loopback endpoints. It does not upload your metrics to a third-party service.
 
+## Antigravity IDE
+
+**v0.7.0** adds a separate VSIX for Google's own standalone IDE. Download
+`antigrative-dashboard-ide-0.7.0.vsix` from the release and choose **Install from VSIX…**
+in the IDE's Extensions view. No desktop App installation is required.
+
+Fully quit the IDE, then start it with
+`--remote-debugging-port=0 --remote-debugging-address=127.0.0.1`.
+Add these flags to your IDE shortcut for subsequent launches. Narrow panes show
+three icons; wider panes show values. Hover/click opens the same metric details.
+
+Windows IDE **2.5.5** has been tested with real conversations. Linux/macOS IDE
+have automated coverage; signed-in GUI acceptance is still outstanding.
+VS Code, Visual Studio, JetBrains, Zed and Xcode integrations are not implemented.
+See [IDE installation, update, diagnostics and data cleanup](ide/README.md).
+
 ## Antigravity CLI status line
 
 Available in **v0.6.0**: an independent adapter for the official Antigravity CLI `statusLine` interface displays context occupancy, cache read tokens, state and grouped quotas, with English/Chinese and terminal-width adaptation. Remaining quota numbers and bars are **green ≥70%, yellow ≥30% and <70%, red <30%**. Preview: `node cli/statusline.mjs --preview`; install: `python manage.py install-cli` (Linux/macOS: `python3`). Requires Node.js 20+ and a CLI supporting the interface. CLI tok/s needs streaming-duration data absent from the documented payload. See [CLI usage and rollback](docs/CLI.md).
@@ -65,6 +81,8 @@ Available in **v0.6.0**: an independent adapter for the official Antigravity CLI
 <sub>Real Windows Antigravity CLI 1.3.2 session after two replies; account email masked. Linux/macOS signed-in interactive acceptance remains outstanding.</sub>
 
 ## Install
+
+The commands below install the **desktop App adapter**. IDE users should use the [separate VSIX instructions above](#antigravity-ide).
 
 Supported: **Windows, Linux and macOS; Antigravity desktop App 2.21.1 / 2.22.0; Python 3.10+**. The same release ZIP works on all three systems. No third-party pip or npm packages are needed to install or run the plugin. The sidecar uses the app's bundled Node.js runtime. See [COMPATIBILITY.md](COMPATIBILITY.md) for the per-platform verification scope.
 
@@ -155,14 +173,14 @@ Records contain whitelisted statistics and model/status only; no prompts, titles
 
 ## Compatibility
 
-Verified on **Windows 11 / Antigravity desktop App 2.21.1 and 2.22.0**, including real context readings and the combined hover card. Not an Antigravity IDE, VS Code, or DSH extension. Linux and macOS have native user paths, backend/port discovery and shell installers. Automated checks run on all three operating systems; full signed-in Linux/macOS GUI verification is still open. See COMPATIBILITY.md.
+Desktop verified on **Windows 11 / Antigravity App 2.21.1 and 2.22.0**, including real context readings and the combined hover card. A separate VSIX supports standalone Antigravity IDE 2.5.5 on Windows. Other editor extensions and DSH are unsupported. Linux/macOS have automated checks; full signed-in desktop/IDE GUI verification is still open. See COMPATIBILITY.md.
 Repository presentation is inspired by [DSH Rail Music](https://github.com/YOU-SHOULD-KNOW-ME/dsh-rail-music); installation APIs differ. `dsh plugin add` cannot install this project.
 
 [Full compatibility and recovery details →](COMPATIBILITY.md)
 
 ### Language
 
-Click **EN** in the model row to switch to Simplified Chinese; click **中** to return to English. The sidecar panel has the same control. The selection persists in local site storage and updates other open views on the same origin. It changes dashboard labels, not the host app or model name.
+Open context details and choose **English / 简体中文** at the bottom. The first-use bilingual tip points to this setting. The desktop adapter saves an atomic user preference shared with its side panel; the IDE saves its own preference in extension global storage. Both survive restarts. This changes dashboard labels, not the host app or model name.
 
 ## FAQ
 

@@ -48,6 +48,20 @@ test('app update replaces the renderer port and reconnects without archive edits
   await ui.stop();
 });
 
+test('custom IDE origin stays connected across heartbeats instead of recycling pending bindings', async () => {
+  const {ui,state,connections}=fixture();
+  state.targets=[{...target(),url:'vscode-file://vscode-app/d:/IDE/out/vs/code/electron-browser/workbench/workbench.html'}];
+  ui.targetOrigin=()=> 'vscode-file://vscode-app';
+  await ui.tick();
+  const c=connections[0];
+  await ui.event(c,{method:'Runtime.executionContextCreated',params:{context:{id:9,origin:'vscode-file://vscode-app',auxData:{isDefault:true,frameId:'main'}}}});
+  for(let i=0;i<8;i++)await ui.tick();
+  assert.equal(connections.length,1);assert.equal(c.closed,false);assert.ok(c.contexts.has(9));
+  assert.equal(c.calls.filter(x=>x.method==='Runtime.addBinding').length,1);
+  await ui.event(c,{method:'Runtime.bindingCalled',params:{name:ui.binding,executionContextId:9,payload:JSON.stringify({id:1,type:'metrics',input:{conversationId:null}})}});
+  assert.equal(state.calls,1);await ui.stop();
+});
+
 test('renderer absence and incompatible transport keep collection alive and recover', async () => {
   const { ui, state } = fixture(); state.targets = []; await ui.tick(); assert.equal(ui.health.state, 'waiting');
   ui.discover = async () => { throw new Error('updater is replacing files'); }; await ui.tick(); assert.equal(ui.health.state, 'reconnecting');

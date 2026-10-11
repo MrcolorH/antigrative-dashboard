@@ -23,8 +23,12 @@ tests/                     生命周期验证
 
 ```powershell
 npm test
+node --test ide/tests/*.test.mjs
 python -m unittest discover -s tests -v
+npm run test:ui
+node tools/check-ide-ui.mjs
 python manage.py package
+python ide/package.py
 ```
 
 无 npm / pip 第三方依赖。Node.js 测试涵盖 TPS 加权、思考与 TTFT 分离、缺失计时、请求去重、重叠工具时间、额度边界、重置到期、账户切换、失联及分页。
@@ -39,6 +43,9 @@ node sidecars/panel/main.mjs
 打开 `http://127.0.0.1:17891` 查看独立面板。`/toolbar-preview?new` 验证新对话同行布局，`/toolbar-preview` 会关联最近活动会话。需要 App 已启动。
 
 ## 数据边界
+
+`ide/` 为独立 Antigravity IDE adapter；VSIX 使用明示模块列表，不包含账户数据、历史、日志或宿主资源。`ide/manage.py` 校验目标应用的 product identity，并调用宿主 bundled runtime。新版本同时生成桌面/CLI ZIP 与 IDE VSIX，各自带 SHA256；发布校验两者版本、完整模块与校验值。
+IDE 进程发现需与 renderer PID 谱系、同用户和端口一致，DOM adapter 只从当前输入框拥有者读取 conversation ID。`tools/check-ide-ui.mjs` 运行真实控件，覆盖 Trusted Types、宽窄布局、会话隔离和轮询滚动稳定性。
 
 安装代码不携带任何账号凭据。sidecar 发现当前 standalone 进程凭据并校验端口归属，不使用可能过期的环境凭据；凭据只在后台内存使用。
 本地 RPC 返回的会话正文不会发给控件；前端只收到数值、状态和模型名称。速率计算使用后台原始元数据，采集后不将完整轨迹落盘。

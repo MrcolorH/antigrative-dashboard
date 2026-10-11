@@ -23,7 +23,7 @@ SETTINGS = _paths['settings']
 APP = _paths['app']
 BACKUPS = _paths['backups']
 RUNTIME_FILES = ('assets', 'compat', 'sidecars', 'plugin.json')
-DIST_FILES = ('plugin.json', 'assets', 'sidecars', 'compat', 'cli', 'manage.py', 'install.ps1',
+DIST_FILES = ('plugin.json', 'assets', 'sidecars', 'compat', 'cli', 'ide', 'manage.py', 'install.ps1',
               'uninstall.ps1', 'install.sh', 'uninstall.sh', 'README.md', 'LICENSE', 'CHANGELOG.md', 'COMPATIBILITY.md', 'docs', 'package.json',
               '.gitignore', '.gitattributes', '.github', 'tests', 'tools', 'GITHUB_RELEASE.md', 'README.zh-CN.md')
 IGNORED = {'__pycache__', '.data', 'node_modules', '.git', 'dist', 'data', 'history-v1', 'sdk'}

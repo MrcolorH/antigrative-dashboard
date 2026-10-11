@@ -56,7 +56,11 @@ export function trajectoryMetrics(response) {
     const chat = generator.chatModel;
     if (!chat?.usage) continue;
     const usage = chat.usage;
-    const id = usage.messageId || generator.executionId || `index:${index}`;
+    // IDE executionId identifies a planner run/turn, not an individual model
+    // request: tool follow-ups share it while having distinct responseIds.
+    // Never collapse those follow-ups, even when no request ID was returned.
+    const id = usage.responseId ? `response:${usage.apiProvider||''}:${usage.responseId}`
+      : usage.messageId ? `message:${usage.messageId}` : `index:${index}`;
     if (ids.has(id)) continue;
     ids.add(id);
     const cached = requestCacheMetrics(usage);

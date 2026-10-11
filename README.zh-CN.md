@@ -7,16 +7,16 @@
 模型选择旁只显示生成速率、缓存和上下文占用；悬停上下文，一并查看上下文、5 小时和周额度详情。<br>
 缩略信息常驻；鼠标悬停，才展开详细统计。
 
-[![Version 0.6.4](https://img.shields.io/badge/version-0.6.4-91adff?style=flat-square&labelColor=252936)](CHANGELOG.md)
+[![Version 0.7.0](https://img.shields.io/badge/version-0.7.0-91adff?style=flat-square&labelColor=252936)](CHANGELOG.md)
 [![Platforms](https://img.shields.io/badge/host-Windows%20%7C%20Linux%20%7C%20macOS-83d8b9?style=flat-square&labelColor=252936)](COMPATIBILITY.md)
 [![Antigravity 2.21.1 / 2.22.0](https://img.shields.io/badge/Antigravity-2.21.1%20%2F%202.22.0-c5a0ff?style=flat-square&labelColor=252936)](COMPATIBILITY.md)
 [![MIT](https://img.shields.io/badge/license-MIT-d4d9e6?style=flat-square&labelColor=252936)](LICENSE)
 
-[看看效果](#看看效果) · [CLI](#antigravity-cli-状态栏) · [开始安装](#安装) · [启用与停用](#可插拔) · [兼容性](#兼容性) · [常见问题](#常见问题)
+[看看效果](#看看效果) · [IDE](#antigravity-ide) · [CLI](#antigravity-cli-状态栏) · [开始安装](#安装) · [启用与停用](#可插拔) · [兼容性](#兼容性) · [常见问题](#常见问题)
 
 </div>
 
-**v0.6.4 更新：** 移除状态条重复语言按钮，加入轻量首次双语引导（[#6](https://github.com/YOU-SHOULD-KNOW-ME/antigrative-dashboard/issues/6)），English / 简体中文切换保留在上下文详情底部。同时修复侧边栏挤压子代理输入框时，原生标签换行、图标缩小的问题；保留已有平滑自适应过渡。[完整更新说明](https://github.com/YOU-SHOULD-KNOW-ME/antigrative-dashboard/releases/tag/v0.6.4)。
+**v0.7.0 更新：** 新增反重力自己的 **Antigravity IDE** 专用 VSIX：窄栏三个图标、拉宽显示数值，读取真实对话统计，保持悬浮卡轮询稳定。同时包含 PR #7 的悬停改进。其他编辑器里的 Antigravity 扩展暂未适配。[完整更新说明](https://github.com/YOU-SHOULD-KNOW-ME/antigrative-dashboard/releases/tag/v0.7.0)。
 
 ## 看看效果
 
@@ -52,6 +52,22 @@
 - **语言设置跨重启保留。** 中英文选择写入独立的 `AntigravityPulse/preferences.json` 用户配置，控件和侧面板共用；不依赖应用每次启动的本地端口。
 - **不上传采集数据。** 后台使用本机 loopback 接口，数值留在你的电脑。
 
+## Antigravity IDE
+
+**v0.7.0** 新增反重力自己的独立 IDE 适配。下载发布页的
+`antigrative-dashboard-ide-0.7.0.vsix`，在 IDE 扩展页选择「从 VSIX 安装」。
+仅安装 IDE 的用户也可以使用，无需先装桌面 App。
+
+完全退出 IDE 后，使用带
+`--remote-debugging-port=0 --remote-debugging-address=127.0.0.1`
+参数的启动方式打开；将参数加到快捷方式目标末尾，后续继续使用该快捷方式。
+窄栏显示三个可交互图标，拉宽后显示数值；悬停或点击即可查看详情。
+
+Windows IDE **2.5.5** 已验证真实对话。Linux/macOS IDE 有自动化覆盖，登录后的
+实机 GUI 验收尚未完成。VS Code、Visual Studio、JetBrains、Zed、Xcode 中的
+Antigravity 扩展目前尚未兼容。详见 [IDE 安装、更新、诊断和数据清理](ide/README.md)。
+上方演示图是桌面 App 控件，不是 IDE 界面截图。
+
 ## Antigravity CLI 状态栏
 
 **v0.6.0 新增**独立的 CLI 官方状态栏适配：上下文占用、缓存读取 Token、状态、分组额度及重置倒计时，支持中英文和终端宽度适配。额度数字和进度条按剩余量显示：**≥70% 绿色、≥30% 且 <70% 黄色、<30% 红色**。预览：`node cli/statusline.mjs --preview --language zh-CN`；安装：`python manage.py install-cli`（Linux/macOS 用 `python3`）。需要 Node.js 20+ 和支持官方接口的 CLI。官方输入没有流式耗时，暂不显示 tok/s。详见 [CLI 使用及撤回](docs/CLI.md)。
@@ -61,6 +77,8 @@
 <sub>Windows Antigravity CLI 1.3.2 真实两轮对话，账号邮箱已遮挡。Linux/macOS 登录后的交互实机验收尚未完成。</sub>
 
 ## 安装
+
+以下命令安装**桌面 App 适配器**；IDE 用户请使用[上方专用 VSIX 安装流程](#antigravity-ide)。
 
 适用于 **Windows / Linux / macOS 的 Antigravity 桌面 App 2.21.1 / 2.22.0 + Python 3.10+**。三系统共用同一个 release ZIP，无 pip / npm 第三方依赖，后台使用 App 自带 Node.js。各平台完整验证范围见 [COMPATIBILITY.md](COMPATIBILITY.md)。
 
@@ -161,7 +179,7 @@ Antigravity 的 `inputTokens` 是未缓存输入。缓存率 = 缓存读取 ÷�
 
 当前实机验证：**Windows 11 / Antigravity App 2.21.1、2.22.0**；2.22.0 的真实上下文读取和合并悬浮卡已验收。Linux/macOS 的完整登录界面仍需用户实机验证，自动化覆盖范围见兼容性文档。
 
-不适用于 Antigravity IDE、VS Code 扩展或 DSH。Linux / macOS 已适配原生路径、进程与端口发现、SDK 加载和 shell 安装器；三系统 CI 验证代码与生命周期，完整登录 App 的端到端验证范围见兼容性文档。
+独立 Antigravity IDE 2.5.5 提供单独 VSIX，Windows 已实机验证。其他编辑器扩展和 DSH 暂不支持。Linux/macOS 桌面版已适配原生路径、后台发现和 shell 安装器；IDE 有自动化覆盖，完整登录界面仍待实机验收，详见兼容性文档。
 参考 DSH Rail Music 的项目组织与文档风格，但安装接口不同，不能使用 `dsh plugin add` 安装 Antigrative Dashboard。
 
 [完整边界与更新策略 →](COMPATIBILITY.md)

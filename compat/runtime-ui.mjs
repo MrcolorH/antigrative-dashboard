@@ -137,9 +137,10 @@ export function makeRendererSource(i18n, widget, theme = '', owner = null, gener
 
 export class RuntimeUi {
   constructor({ snapshot, source, profile = platformPaths().profile,
-    dataDir, preferences, owner=null, owns=async()=>true, enabled = async () => true, discover = discoverTargets, connect = (url, options) => new CdpConnection(url, options), interval = 3000 } = {}) {
+    dataDir, preferences, owner=null, owns=async()=>true, enabled = async () => true, discover = discoverTargets, targetOrigin = target => new URL(target.url).origin, connect = (url, options) => new CdpConnection(url, options), interval = 3000 } = {}) {
     this.snapshot = snapshot; this.source = source; this.profile = profile; this.dataDir = dataDir; this.enabled = enabled;
     this.discover = discover; this.connect = connect; this.interval = interval; this.sessions = new Map(); this.running = false;
+    this.targetOrigin=targetOrigin;
     this.health = { state: 'waiting', mode: 'runtime', message: 'Waiting for the app renderer', windows: 0 };
     this.preferences=preferences;
     this.owner=owner;this.owns=owns;
@@ -187,7 +188,7 @@ export class RuntimeUi {
   async attach(target) {
     let connection;
     connection = this.connect(target.webSocketDebuggerUrl, { onEvent: message => { void this.event(connection, message); } });
-    connection.origin = new URL(target.url).origin;
+    connection.origin = this.targetOrigin(target);
     connection.contexts = new Set(); connection.inflight = 0; connection.mounted = false;
     try {
       await connection.open();
@@ -222,7 +223,7 @@ export class RuntimeUi {
       for (const [url, connection] of this.sessions) if (!active.has(url) || connection.closed) { connection.close(); this.sessions.delete(url); }
       for (const target of targets) {
         const connection = this.sessions.get(target.webSocketDebuggerUrl);
-        if (connection && connection.origin !== new URL(target.url).origin) { connection.close(); this.sessions.delete(target.webSocketDebuggerUrl); }
+        if (connection && connection.origin !== this.targetOrigin(target)) { connection.close(); this.sessions.delete(target.webSocketDebuggerUrl); }
       }
       for (const target of targets) if (!this.sessions.has(target.webSocketDebuggerUrl)) this.sessions.set(target.webSocketDebuggerUrl, await this.attach(target));
       if (this.stopping||!await this.owns()) { await this.detachAll(); return; }

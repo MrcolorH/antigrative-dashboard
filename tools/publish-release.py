@@ -21,9 +21,26 @@ def checked_assets(root, tag):
         manifest = json.loads(archive.read(prefix + 'plugin.json'))
         if manifest['version'] != version:
             raise ValueError('Packaged version differs')
+        for required in ['ide/package.json', 'ide/manage.py', 'ide/package.py', 'ide/README.md']:
+            archive.getinfo(prefix + required)
         for required in ['install.sh', 'uninstall.sh', 'install.ps1', 'compat/runtime-ui.mjs', 'compat/theme.cjs', 'compat/host-theme.mjs', 'compat/preferences.mjs', 'compat/sidecar-owner.mjs', 'sidecars/panel/context.mjs', 'cli/statusline.mjs', 'cli/metrics.mjs', 'cli/render.mjs', 'cli/lifecycle.py', 'docs/CLI.md', 'docs/assets/cli-conversation.png', 'docs/assets/cli-conversation-zh.png']:
             archive.getinfo(prefix + required)
-    return [bundle, checksum]
+    ide_version = json.loads((root / 'ide/package.json').read_text(encoding='utf-8'))['version']
+    if ide_version != version:
+        raise ValueError('IDE and desktop versions differ')
+    ide = root / 'dist' / f'antigrative-dashboard-ide-{version}.vsix'
+    ide_checksum = ide.with_suffix('.vsix.sha256')
+    if ide_checksum.read_text(encoding='utf-8').split() != [hashlib.sha256(ide.read_bytes()).hexdigest(), ide.name]:
+        raise ValueError('IDE package checksum mismatch')
+    with zipfile.ZipFile(ide) as archive:
+        package = json.loads(archive.read('extension/package.json'))
+        if package['version'] != version or package['name'] != 'antigrative-dashboard-ide':
+            raise ValueError('Packaged IDE identity/version differs')
+        for name in ['extension/ide/extension.cjs', 'extension/ide/host.cjs', 'extension/ide/main.mjs',
+                     'extension/ide/surface.cjs', 'extension/ide/manage.py', 'extension/compat/inline-widget.cjs',
+                     'extension/README.md', 'extension/LICENSE']:
+            archive.getinfo(name)
+    return [bundle, checksum, ide, ide_checksum]
 
 
 class GitHub:

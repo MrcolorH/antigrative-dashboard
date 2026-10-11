@@ -6,8 +6,18 @@
 | Linux | Python3 / POSIX shell，当前用户 `/proc` + TCP/TCP6 socket inode | Ubuntu CI 原生端口测试、安装生命周期、官方 2.21.1 资源与 SDK 检查；完整登录 App GUI 待用户实机验证 |
 | macOS | Python3 / POSIX shell，当前用户 `ps` + `lsof` PID 所属端口 | macOS CI 原生端口测试、安装生命周期、官方 2.21.1 资源与 SDK 检查；完整登录 App GUI 待用户实机验证 |
 
-面向 **Antigravity 桌面 App 2.21.1 / 2.22.0**，不是 Antigravity IDE、VS Code 扩展、CLI 或 iOS。Linux/macOS 官方资源检查固定为 2.21.1，不等同于已验证其 2.22.0 登录界面。
+上表面向 **Antigravity 桌面 App 2.21.1 / 2.22.0**。CLI 使用独立 statusLine 适配；v0.7.0 新增自带 IDE 的独立 VSIX。VS Code、Visual Studio、JetBrains、Zed、Xcode 中的 Antigravity 扩展以及 iOS 尚未兼容。Linux/macOS 官方资源检查固定为桌面 App 2.21.1，不等同于验证 IDE 或其 2.22.0 登录界面。
 Python 3.10+ 仅用于生命周期，无 pip 依赖；后台使用宿主 Node，内嵌桥接需原生 WebSocket，建议 Node 24。Linux/macOS 架构跟随宿主，不分发平台二进制。官方系统要求见 [Antigravity 下载页](https://antigravity.google/download)。
+
+## Antigravity 自带 IDE
+
+专用包为 `antigrative-dashboard-ide-0.7.0.vsix`，安装入口与桌面 App 独立。
+Windows 11 / IDE 2.5.5（VS Code base 1.107.0）已用真实对话验证速率、缓存、上下文、重启历史恢复和窄宽布局。
+Linux/macOS 的 IDE 进程筛选、端口归属、安装打包和 Trusted Types 浏览器 fixture 纳入 CI；登录后的 IDE GUI 仍待实机验收。
+当前仅支持默认用户 profile；私有 Preact/DOM 或 RPC 变化可能需要适配，不能保证未来 IDE 版本无需维护。
+插件需通过 loopback renderer 端口挂载：完整退出后带 `--remote-debugging-port=0 --remote-debugging-address=127.0.0.1` 参数启动。普通启动不会自动打开此端口。
+不修改应用归档或 CSP，扩展启动／停止后台，并按 profile 协调多窗口所有权。用户数据保存在 IDE 自己的 extension global storage，与桌面 App 的历史和语言设置独立。
+完整安装、升级、数据清理与撤回流程见 [ide/README.md](ide/README.md)。
 
 ## 安装与自定义位置
 

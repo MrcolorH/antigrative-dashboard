@@ -38,3 +38,14 @@ test('protobuf-omitted zero cache is zero; absent input, invalid provider and un
   assert.equal(requestCacheMetrics({apiProvider:'API_PROVIDER_OPENAI',inputTokens:String(Number.MAX_SAFE_INTEGER),cacheReadTokens:'1'}),null);
   assert.equal(trajectoryMetrics({trajectory:{}}).cache.hitRate,null);
 });
+
+test('IDE tool follow-ups share executionId but distinct responses must contribute cache and TPS',()=>{
+  const model=(responseId,input,read,output,duration)=>({executionId:'one-planner-turn',chatModel:{usage:{responseId,apiProvider:'API_PROVIDER_GOOGLE_GEMINI',inputTokens:String(input),cacheReadTokens:String(read),responseOutputTokens:String(output),outputTokens:String(output)},streamingDuration:duration}});
+  const first=model('first',1000,0,100,'2s'),followup=model('followup',100,900,200,'2s');
+  const result=trajectoryMetrics({trajectory:{generatorMetadata:[first,followup,structuredClone(followup)]}});
+  assert.equal(result.requests,2);assert.equal(result.measuredRequests,2);assert.equal(result.tps,75);
+  assert.equal(result.cache.measuredRequests,2);assert.equal(result.cache.cachedTokens,900);assert.equal(result.cache.inputTokens,2000);assert.equal(result.cache.hitRate,.45);
+  // A turn ID remains insufficient to deduplicate unidentified requests.
+  delete first.chatModel.usage.responseId;delete followup.chatModel.usage.responseId;
+  assert.equal(trajectoryMetrics({trajectory:{generatorMetadata:[first,followup]}}).cache.hitRate,.45);
+});

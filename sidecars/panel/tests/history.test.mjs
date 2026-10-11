@@ -37,6 +37,18 @@ test('empty or regressing backend results cannot overwrite useful history; newer
   n=3;const updated=await store.snapshot({conversationId:id,force:true});assert.equal(updated.speed.requests,3);assert.equal(updated.speed.restoredFromHistory,false);
   assert.equal((await history.load(scope('a@example.test'),id)).metrics.requests,3);
 });
+
+test('corrected IDE response deduplication replaces old zero-cache history and survives restart',async t=>{
+  const {history}=await fixture(t);
+  const model=(responseId,input,read)=>({executionId:'shared-turn',chatModel:{usage:{responseId,apiProvider:'API_PROVIDER_GOOGLE_GEMINI',inputTokens:String(input),cacheReadTokens:String(read),outputTokens:'100',responseOutputTokens:'100'},streamingDuration:'2s'}});
+  const trajectory={trajectory:{cascadeId:id,generatorMetadata:[model('first',1000,0),model('next',100,900)],steps:[]}};
+  // Represent the old collector's undercounted saved conversation.
+  await history.save(scope('a@example.test'),id,trajectoryMetrics({trajectory:{cascadeId:id,generatorMetadata:trajectory.trajectory.generatorMetadata.slice(0,1)}}));
+  const corrected=await new MetricsStore(client(async()=>trajectory),{history}).snapshot({conversationId:id});
+  assert.equal(corrected.speed.cache.hitRate,.45);assert.equal(corrected.speed.requests,2);
+  const restored=await new MetricsStore(client(async()=>{throw Error('offline');}),{history:new SessionHistory(history.directory)}).snapshot({conversationId:id});
+  assert.equal(restored.speed.cache.hitRate,.45);assert.equal(restored.speed.requests,2);assert.equal(restored.speed.restoredFromHistory,true);
+});
 test('account isolation, malformed files, invalid paths and unknown schemas fail closed',async t=>{
   const {history}=await fixture(t);const a=scope('a');await history.save(a,id,trajectoryMetrics(raw()));
   assert.equal(await history.load(scope('b'),id),null);assert.throws(()=>history.file(a,'../escape'));
