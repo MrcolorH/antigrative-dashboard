@@ -114,18 +114,28 @@ python manage.py install
 ```text
 请帮我安装并启用 Antigrative Dashboard。
 仓库：https://github.com/YOU-SHOULD-KNOW-ME/antigrative-dashboard
-目标：在模型选择旁显示 tok/s、缓存和上下文；悬停上下文统一查看其详情、5h 和周额度及倒计时。
-
-1. 读取 README.md 和 COMPATIBILITY.md，确认 Windows、Linux 或 macOS、Antigravity 桌面
-   App 2.21.1 / 2.22.0、Python 3.10+。不要自动升级、降级或替换我的 App。
-2. 将项目克隆 / 解压到固定目录，不在临时下载目录运行。
-3. 用 python manage.py status 检查已有状态，再执行 python manage.py install。
-   保留其他插件配置，使用自带备份和完整性校验。
-4. 安装后完全重启 Antigravity；如果有任务正在执行，先告知需要重启，
-   不要强制结束任务。
-5. 验证新对话的上下文入口、有请求对话的 TPS / 缓存 / 上下文；悬停上下文同时显示两种额度。
-   打开额度组菜单等待多次轮询，确认不会被刷新关闭。
-6. 报告安装结果、版本、运行时连接状态和实机验证范围。
+1. 读取 README.md、COMPATIBILITY.md、docs/CLI.md 和 ide/README.md。先用只读检查
+   分析系统、可执行文件、宿主版本和已有插件配置，区分桌面 App、Antigravity CLI
+   （agy）和独立 Antigravity IDE；不能仅凭系统判断安装目标。
+2. 下载安装包或修改配置前，向我说明检测到哪些宿主，并让我明确确认要安装
+   App、CLI 还是独立 IDE 适配。如同时安装了多个，让我选一个或多个；无法识别
+   则询问可执行文件路径。不要因为我是 Linux 或在终端里就默认安装桌面端。
+3. 查询最新稳定发布，说明插件版本、宿主版本和路径、选定适配器。App 与 CLI
+   共用 ZIP，但安装命令不同；独立 IDE 使用单独 VSIX。只下载已确认目标需要的
+   文件并校验 SHA256，将源码解压到固定目录。不要未经单独确认安装、升级、
+   降级或替换 Antigravity 宿主。
+4. 使用 Python 3.10+（Linux/macOS 通常用 python3），按确认的目标执行：
+   - App：先 python manage.py status，再 python manage.py install。
+   - CLI：检查 agy --version 和 Node.js 20+，执行 python manage.py install-cli，
+     不要执行 manage.py install。已有 statusLine 按 CLI 文档备份／覆盖流程处理。
+     不承诺 CLI 展示 tok/s、缓存命中率或本地用量图表，这些不在 CLI 适配范围内。
+   - 独立 IDE：通过 Install from VSIX... 安装发布版 VSIX，或使用
+     ide/manage.py install --exe <已核实的IDE可执行文件> --vsix <发布版VSIX>。
+     不需要桌面 App，不要执行 App 安装器。
+5. 保留其他设置和已保存数据。需要重启或登录时先告知，不强制结束正在执行的
+   任务。IDE 按文档保留本机回环调试启动参数；CLI 在新会话中验证。
+6. 在选定的真实宿主中验证，报告插件／宿主版本、安装目标和路径、实际完成的
+   检查、剩余步骤，以及该适配器的停用／卸载方法。下载 ZIP 不代表 CLI 已安装成功。
 ```
 
 </details>

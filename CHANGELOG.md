@@ -2,6 +2,7 @@
 
 ## 0.8.0 — 2026-10-11
 
+- Make English/Chinese agent installation prompts detect the host and require target confirmation before downloads/configuration changes. Distinguish App, CLI and standalone IDE; the shared ZIP does not mean the App installer should run for CLI users.
 - Add local Token usage to the desktop App and standalone IDE: daily/weekly contribution grids, day/week/month model stacks, model filtering, full-count tooltips/tables, and a compact two-column Today / This month cache-card entry. Theme-driven model colors follow custom accent/background changes.
 - Keep the usage frame stable across month changes, empty data, missing snapshots, account switches and composer replacement. Use a themed year menu and aligned controls; manual refresh queues behind polling and completes a visible rotation.
 - Explain local history import, UTC+8 date boundaries, coverage/billing limits and storage on first opening. Persist acknowledgment independently of language; save failures stay visible and retryable. Local replay controls are excluded from packaged collectors.

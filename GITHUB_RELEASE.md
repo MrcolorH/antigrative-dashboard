@@ -20,6 +20,7 @@ See [TPS policy](https://github.com/YOU-SHOULD-KNOW-ME/antigrative-dashboard/blo
 
 ## Interaction fixes
 
+- Revise agent installation guidance: detect the OS and host, confirm App/CLI/standalone IDE before downloading or changing settings, and use only the selected adapter. App and CLI share the ZIP but use separate installers; IDE uses VSIX.
 - Keep the usage window open across polling, temporary missing snapshots and composer replacement; account switches clear stale displayed data.
 - Queue manual refresh behind polling and complete its visible rotation.
 - Restore pointer and keyboard focus correctly when closing usage. Hover cards auto-dismiss after the pointer leaves.

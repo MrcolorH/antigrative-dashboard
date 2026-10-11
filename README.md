@@ -116,20 +116,35 @@ The installer copies and enables the plugin and restores any exactly verified le
 ```text
 Install and enable Antigrative Dashboard on this computer.
 Repository: https://github.com/YOU-SHOULD-KNOW-ME/antigrative-dashboard
-Goal: show tok/s, cache and context in the Antigravity model selector row;
-hover context for its details and five-hour/weekly quotas with reset countdowns.
-
-1. Read README.md and COMPATIBILITY.md. Verify Windows, Linux or macOS, Antigravity desktop
-   (tested with App 2.21.1 / 2.22.0), and Python 3.10+. Do not upgrade, downgrade, or replace my app.
-2. Clone or extract the project to a permanent directory.
-3. Inspect python manage.py status, then run python manage.py install.
-   Preserve other plugin settings and use the built-in backup validation.
-4. Fully restart Antigravity. If a task is running, report the required
-   restart and do not forcibly interrupt it.
-5. Verify new-chat context entry, existing-chat TPS/cache/context, and the combined quota hover card. Leave the
-   quota-group menu open across several polls and confirm it stays open.
-6. Report the app version, installation result, runtime integration status, and what was
-   actually verified on this machine.
+1. Read README.md, COMPATIBILITY.md, docs/CLI.md and ide/README.md. Inspect the OS,
+   available executables, host versions and existing dashboard configuration with
+   read-only checks. Distinguish desktop App, Antigravity CLI (agy) and standalone
+   Antigravity IDE. The OS alone does not identify the target.
+2. Before downloading an installation package or changing settings, summarize the
+   detected hosts and ask me to confirm the target: App, CLI or standalone IDE.
+   If several are present, let me choose one or more; if none is identified, ask
+   for its executable path. Do not guess App when I say Linux or terminal.
+3. Fetch the latest stable release metadata and report its plugin version, the
+   host version/path and the selected adapter. The App and CLI share a ZIP, but
+   their installation commands differ. The standalone IDE uses a separate VSIX.
+   Download only assets for the confirmed target and verify SHA256. Keep the
+   extracted source in a permanent directory. Do not install the host itself or
+   upgrade, downgrade or replace it without separate confirmation.
+4. Use Python 3.10+ (python3 on Linux/macOS) and the selected instructions:
+   - App: check python manage.py status, then python manage.py install.
+   - CLI: check agy --version and Node.js 20+, then python manage.py install-cli.
+     Do not run manage.py install. Preserve any existing statusLine using the
+     documented backup/override flow. Do not claim CLI tok/s, cache ratio or local
+     usage charts: those desktop metrics are not available through this adapter.
+   - Standalone IDE: install the release VSIX through Install from VSIX... or
+     ide/manage.py install --exe <verified-IDE-executable> --vsix <release-VSIX>.
+     It does not require the desktop App; do not run the App installer.
+5. Preserve unrelated settings and saved data. If a restart or login is needed,
+   tell me first and do not forcibly interrupt running tasks. For IDE launches,
+   follow its documented loopback debugging flags. For CLI, start a new session.
+6. Verify the selected adapter in its real host, and report plugin/host versions,
+   target, path, checks actually performed, remaining steps and how to disable or
+   uninstall that adapter. Never treat installing a ZIP as proof of CLI success.
 ```
 
 </details>

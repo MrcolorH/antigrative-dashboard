@@ -84,6 +84,10 @@ try{
       const oldLanguage=await strip.getAttribute('lang');
       await strip.locator(oldLanguage==='en'?'#card-language-zh':'#card-language-en').click();
       await page.waitForFunction(old=>document.getElementById('ag-pulse-status-bar')?.lang!==old,oldLanguage);
+      // Translated chip widths can move the card away from the pointer. A
+      // pointer-focused choice no longer pins it after leaving; reopen through
+      // its actual chip before exercising the reverse language selection.
+      await strip.locator('[data-card=context]').click();
       await strip.locator(oldLanguage==='en'?'#card-language-en':'#card-language-zh').click();
       await page.waitForFunction(old=>document.getElementById('ag-pulse-status-bar')?.lang===old,oldLanguage);
       await page.keyboard.press('Escape');
