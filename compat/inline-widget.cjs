@@ -15,7 +15,9 @@ module.exports = function installAgPulseInlineWidget() {
   window.__agPulseInlineInstalled=true;
   report('boot',{hostFound:true});
   const ID='ag-pulse-status-bar';
-  let node=null,root=null,data=null,pending=false,cardName=null,hoverTimer=null,lastConversation=null,lastFetch=0,lastExpiredRefresh=0,resizeObserver=null,groupMenu=null,themeController=null,changingCards=false;
+  let node=null,root=null,data=null,pending=false,cardName=null,hoverTimer=null,openTimer=null,lastWarmAt=0,lastConversation=null,lastFetch=0,lastExpiredRefresh=0,resizeObserver=null,groupMenu=null,themeController=null,changingCards=false;
+  const HOVER_DELAY=250,WARM_WINDOW=350,LEAVE_DELAY=120;
+  const isWarm=()=>Boolean(cardName||(lastWarmAt>0&&Date.now()-lastWarmAt<WARM_WINDOW));
   let chosen=localGet('ag-pulse-group'),group=null;
   let refreshRequest=null,manualRequest=null,requestEpoch=0,disposed=false;
   let composer=null,layoutFrame=null;
@@ -275,6 +277,8 @@ module.exports = function installAgPulseInlineWidget() {
     else {if(element.hasAttribute('popover')&&element.matches(':popover-open'))element.hidePopover();element.hidden=true;}
   }
   function hide(){
+    clearTimeout(openTimer);openTimer=null;
+    if(cardName)lastWarmAt=Date.now();
     changingCards=true;
     try{closeGroup();cardName=null;for(const e of root?.querySelectorAll('[data-card]')||[])e.setAttribute('aria-expanded','false');for(const e of root?.querySelectorAll('.card')||[])cardVisibility(e,false);}
     finally{changingCards=false;}
@@ -283,13 +287,36 @@ module.exports = function installAgPulseInlineWidget() {
   function show(name){
     if(changingCards||node?.dataset.layout==='blocked')return;
     if(cardName!==name)closeGroup();
-    clearTimeout(hoverTimer);cardName=name;
+    clearTimeout(hoverTimer);
+    clearTimeout(openTimer);openTimer=null;
+    cardName=name;lastWarmAt=Date.now();
     for(const e of root.querySelectorAll('[data-card]'))e.setAttribute('aria-expanded',String(e.dataset.card===name));
     changingCards=true;
     try{for(const e of root.querySelectorAll('.card'))cardVisibility(e,e.id===`${name}-card`);}
     finally{changingCards=false;}
     updateGuide();
     position();
+  }
+  function hoverChip(name){
+    clearTimeout(hoverTimer);
+    if(isWarm()){
+      clearTimeout(openTimer);openTimer=null;
+      show(name);
+    }else{
+      clearTimeout(openTimer);
+      openTimer=setTimeout(()=>{
+        openTimer=null;
+        show(name);
+      },HOVER_DELAY);
+    }
+  }
+  function leaveChip(){
+    clearTimeout(openTimer);openTimer=null;
+  }
+  function scheduleHide(){
+    clearTimeout(openTimer);openTimer=null;
+    clearTimeout(hoverTimer);
+    hoverTimer=setTimeout(()=>{if(!cardEngaged())hide();},LEAVE_DELAY);
   }
   function position(){
     positionGuide();
@@ -463,13 +490,16 @@ module.exports = function installAgPulseInlineWidget() {
     report('mounted',{editorFound:true,composerFound:true});
     observeComposer();
     for(const chip of root.querySelectorAll('[data-card]')){
-      chip.addEventListener('pointerenter',()=>show(chip.dataset.card));chip.addEventListener('focus',()=>show(chip.dataset.card));chip.addEventListener('click',()=>show(chip.dataset.card));
+      chip.addEventListener('pointerenter',()=>hoverChip(chip.dataset.card));chip.addEventListener('pointerleave',leaveChip);chip.addEventListener('focus',()=>show(chip.dataset.card));chip.addEventListener('click',()=>show(chip.dataset.card));
+    }
+    for(const card of root.querySelectorAll('.card')){
+      card.addEventListener('pointerenter',()=>clearTimeout(hoverTimer));card.addEventListener('pointerleave',scheduleHide);
     }
     // A host composer may focus its editor on bubbled clicks. Keep plugin
     // controls' mouse actions inside the shadow root while retaining their
     // default focus/click behavior and document-level outside-click dismissal.
     for(const type of ['pointerdown','mousedown','click'])root.addEventListener(type,event=>event.stopPropagation());
-    node.addEventListener('pointerenter',()=>clearTimeout(hoverTimer));node.addEventListener('pointerleave',()=>{hoverTimer=setTimeout(()=>{if(!cardEngaged())hide();},100);});
+    node.addEventListener('pointerenter',()=>clearTimeout(hoverTimer));node.addEventListener('pointerleave',scheduleHide);
     root.addEventListener('focusout',()=>setTimeout(()=>{if(!cardEngaged())hide();},0));
     for(const button of root.querySelectorAll('.group-trigger'))button.addEventListener('click',()=>{
       const menu=button.parentElement.querySelector('.group-menu');const opening=menu.hidden;closeGroup();if(opening){groupMenu=menu;menu.hidden=false;button.setAttribute('aria-expanded','true');}
@@ -576,7 +606,7 @@ module.exports = function installAgPulseInlineWidget() {
   const timerId=setInterval(()=>{mount();fit();tick();position();if(conversationId()!==lastConversation||Date.now()-lastFetch>(document.hidden?10000:2200))refresh();},1000);
   window.__agPulseDispose=()=>{
     disposed=true;requestEpoch++;pending=false;refreshRequest=null;stopDensityMotion();densityFrame=null;densityProbe=null;
-    clearInterval(timerId);clearTimeout(hoverTimer);if(layoutFrame!==null)cancelAnimationFrame(layoutFrame);observer.disconnect();resizeObserver?.disconnect();themeController?.dispose();preferences.dispose();hide();node?.remove();
+    clearInterval(timerId);clearTimeout(hoverTimer);clearTimeout(openTimer);if(layoutFrame!==null)cancelAnimationFrame(layoutFrame);observer.disconnect();resizeObserver?.disconnect();themeController?.dispose();preferences.dispose();hide();node?.remove();
     document.removeEventListener('keydown',onKey);document.removeEventListener('pointerdown',onPointer);
     document.removeEventListener('scroll',scheduleLayout,true);window.removeEventListener('resize',scheduleLayout);
     densityMedia.removeEventListener('change',stopDensityMotion);
