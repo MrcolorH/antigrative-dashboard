@@ -33,9 +33,12 @@ async function check(name,run,{realTimers=false}={}){
   const page=await browser.newPage({viewport:{width:1100,height:850}});
   page.on('pageerror',error=>errors.push({case:name,message:error.message}));
   try{
+    // Install before the widget registers timers/rAF callbacks. Replacing the
+    // clock after mount can strand a native layout callback on macOS Chromium.
+    if(!realTimers){await page.clock.install();await page.clock.pauseAt(new Date(Date.now()+100));}
     await page.goto(`http://127.0.0.1:${server.address().port}/fixture`);
     await chip(page,'speed').waitFor();
-    if(!realTimers){await page.clock.install();await page.clock.pauseAt(new Date(Date.now()+100));}
+    if(!realTimers)await page.clock.runFor(32);
     await run(page);
     assert.deepEqual(errors,[],'Production widget must not throw browser errors');
     results.push(name);
@@ -85,7 +88,16 @@ try{
   });
   await check('blocked layout cancels a pending popup',async page=>{
     await chip(page,'speed').hover();await page.clock.runFor(100);
-    await host(page).evaluate(node=>{node.style.flex='0 0 40px';node.style.maxWidth='40px';});
+    const width=await host(page).evaluate(node=>{
+      node.style.flex='0 0 40px';node.style.maxWidth='40px';
+      const width=node.getBoundingClientRect().width;
+      // Exercise the production resize listener under the same clock; native
+      // ResizeObserver delivery is asynchronous and not driven by runFor().
+      window.dispatchEvent(new Event('resize'));
+      return width;
+    });
+    assert.ok(width>0&&width<=40,'The fixture must actually constrain the strip to 40px');
+    await page.clock.runFor(16);assert.equal(await host(page).getAttribute('data-layout'),'blocked');
     await page.clock.runFor(500);assert.equal(await host(page).getAttribute('data-layout'),'blocked');assert.equal(await card(page,'speed').isVisible(),false);
   });
   await check('navigation rejects an old pending popup before the next heartbeat',async page=>{
