@@ -20,6 +20,124 @@ const run = (input, args = [], env = {}) => spawnSync(process.execPath, [script,
   input: typeof input === 'string' ? input : JSON.stringify(input), encoding: 'utf8', env: { ...process.env, ...env }, timeout: 10000,
 });
 
+const cachePayload = (input = 190, read = 17244, write = 0, model = { id: 'claude-sonnet-4-6' }, version = '1.3.2') => ({
+  version, model, context_window: { used_percentage: 8.6, total_input_tokens: 999999, total_output_tokens: 888888,
+    current_usage: { input_tokens: input, cache_read_input_tokens: read, cache_creation_input_tokens: write, output_tokens: 777777 } },
+});
+
+// Numeric fixtures from nine completed real Windows CLI 1.3.2 experiment turns.
+// No conversation IDs, account metadata or prompts are committed.
+test('real CLI cache samples use separate current input/read counters, never output or totals', () => {
+  for (const [model, rows] of [
+    ['Claude Sonnet 4.6 (Thinking)', [[7776,9450,54.86], [3809,13521,78.02], [190,17244,98.91]]],
+    ['GPT-OSS 120B (Medium)', [[10334,2752,21.03], [103,13056,99.22], [10480,2752,20.80]]],
+    ['Gemini 3.8 Flash (High)', [[15959,0,0], [16176,0,0], [16309,0,0]]],
+  ]) for (const [input, read, expected] of rows) {
+    const payload = cachePayload(input, read, 0, { display_name: model });
+    const metrics = normalize(payload);
+    assert.ok(Math.abs(metrics.cacheRate.percentage - expected) < 0.005);
+    payload.context_window.total_input_tokens = 1;
+    payload.context_window.current_usage.output_tokens = 0;
+    assert.deepEqual(normalize(payload).cacheRate, metrics.cacheRate);
+  }
+  assert.match(render(normalize(cachePayload()), { color: false }), /Cache 98\.9% · 17\.2K read/);
+});
+
+test('cache policy validates version, model identity and unverified cache-write semantics', () => {
+  for (const id of ['claude-sonnet-4-6', 'Claude Sonnet 4.6 (Thinking)', 'gpt-oss-120b-medium', 'GPT-OSS 120B (Medium)']) {
+    assert.equal(normalize(cachePayload(1, 99, 0, { id })).cacheRate.percentage, 99);
+  }
+  for (const model of [{ id: 'Gemini', display_name: 'Claude Sonnet 4.6 (Thinking)' },
+    { id: 'claude-opus-4-6' }, { id: 'gpt-oss-20b' }, { id: 'future-model' }, {}]) {
+    assert.equal(normalize(cachePayload(1, 99, 0, model)).cacheRate.reason, 'unverified-model');
+  }
+  for (const version of [undefined, '1.3.4', '1.4.0', 'v1.3.2', 1.3]) {
+    const payload = cachePayload(); payload.version = version;
+    assert.equal(normalize(payload).cacheRate.reason, 'unverified-cli-version');
+  }
+  assert.equal(normalize(cachePayload(1, 99, 1)).cacheRate.reason, 'unverified-cache-write');
+  assert.equal(normalize(cachePayload(1, 0, 1, {}, 'future')).cacheRate.percentage, 0);
+  assert.equal(normalize(cachePayload(0, 99)).cacheRate.percentage, 100);
+  assert.equal(normalize(cachePayload(0, 0)).cacheRate.reason, 'empty-input');
+});
+
+test('Linux CLI 1.3.3 Sonnet/GPT real samples have the same separate-input scope', () => {
+  for (const [model, rows] of [
+    ['Claude Sonnet 4.6 (Thinking)', [[18290,0], [8721,9648], [182,18287]]],
+    ['GPT-OSS 120B (Medium)', [[10835,2752], [10904,2752], [93,13632]]],
+  ]) for (const [input, read] of rows) {
+    const metrics = normalize(cachePayload(input, read, 0, { id: model }, '1.3.3'));
+    assert.equal(metrics.cacheRate.percentage, read / (input + read) * 100);
+  }
+});
+
+test('Gemini 3.8 Flash High CLI 1.3.3 displays nonzero cache rates in both languages', () => {
+  // Rounded deidentified regression fixture, shaped like the diagnosed request.
+  for (const id of ['gemini-3.8-flash-high', 'Gemini 3.8 Flash (High)']) {
+    const payload = cachePayload(2100, 130000, 0, { id }, '1.3.3');
+    const metrics = normalize(payload);
+    assert.equal(metrics.cacheRate.percentage, 130000 / 132100 * 100);
+    assert.match(render(metrics, { color: false }), /Cache 98\.4% · 130K read/);
+    assert.match(render(metrics, { color: false, language: 'zh-CN' }), /缓存 98\.4% · 130K 读取/);
+    assert.match(run(payload, ['--language', 'en', '--no-color']).stdout, /Cache 98\.4%/);
+    assert.equal(normalize({ ...payload, version: '1.3.2' }).cacheRate.percentage, null);
+    payload.model = { id: 'future-model', display_name: 'Gemini 3.8 Flash (High)' };
+    assert.equal(normalize(payload).cacheRate.percentage, null);
+    payload.model = { id }; payload.context_window.current_usage.cache_creation_input_tokens = 1;
+    assert.equal(normalize(payload).cacheRate.reason, 'unverified-cache-write');
+  }
+});
+
+test('invalid counters and overflow do not create percentages; missing input differs from real zero', () => {
+  for (const field of ['input_tokens', 'cache_read_input_tokens', 'cache_creation_input_tokens']) {
+    for (const value of [undefined, null, '100', -1, 0.5, NaN, Infinity, Number.MAX_SAFE_INTEGER + 1]) {
+      const payload = cachePayload(); payload.context_window.current_usage[field] = value;
+      assert.equal(normalize(payload).cacheRate.reason, 'missing-or-invalid-counts');
+    }
+  }
+  assert.equal(normalize(cachePayload(Number.MAX_SAFE_INTEGER, 1)).cacheRate.reason, 'unsafe-total');
+  assert.equal(normalize(cachePayload()).cacheRate.percentage > 0, true);
+  assert.equal(normalize({}).cacheRate.percentage, null);
+  assert.equal(normalize(cachePayload(1, 99, 0, { id: 'Gemini' })).cacheRate.percentage, null);
+  assert.equal(normalize(cachePayload(1, 0)).cacheRate.percentage, 0);
+});
+
+test('busy zero cache snapshots are pending, never a fabricated zero or a previous request', () => {
+  for (const agent_state of ['thinking', 'working', 'tool_use', 'initializing']) {
+    for (const input of [0, 2100]) {
+      const payload = { ...cachePayload(input, 0), agent_state };
+      const metrics = normalize(payload);
+      assert.equal(metrics.cacheRate.reason, 'awaiting-stable-usage');
+      assert.equal(metrics.cacheRate.percentage, null);
+      assert.equal(metrics.cacheReadTokens, 0, 'JSON preserves raw supplied counters');
+      for (const language of ['en', 'zh-CN']) {
+        const text = render(metrics, {color:false,language});
+        assert.match(text, language === 'en' ? /Cache --/ : /缓存 --/);
+        assert.doesNotMatch(text, /(?:Cache|缓存) 0%|0 read|0 读取/);
+      }
+    }
+    const valid = { ...cachePayload(), agent_state };
+    assert.ok(normalize(valid).cacheRate.percentage > 98, 'Available nonzero reads remain useful while working');
+  }
+  assert.equal(normalize({ ...cachePayload(2100, 0), agent_state:'idle' }).cacheRate.percentage, 0);
+  assert.equal(normalize({ ...cachePayload(0, 0), agent_state:'idle' }).cacheRate.reason, 'empty-input');
+  assert.ok(run({...cachePayload(),agent_state:'idle'}, ['--no-color']).stdout.includes('98.9%'));
+  const result=run({...cachePayload(2100,0),agent_state:'working'}, ['--no-color']);
+  assert.equal(result.status,0);assert.match(result.stdout,/Cache --/);assert.doesNotMatch(result.stdout,/98\.9%|0 read/);
+  assert.match(run({...cachePayload(2100,0),agent_state:'idle'}, ['--no-color']).stdout,/Cache 0% · 0 read/);
+});
+
+test('narrow first row retains context and cache percentages before secondary read counts', () => {
+  const metrics = normalize(cachePayload());
+  for (const language of ['en', 'zh-CN']) for (let width = 1; width <= 500; width++) {
+    const row = render(metrics, { language, width, color: false }).split('\n')[0];
+    assert.ok(displayWidth(row) <= width);
+    if (width >= 27) assert.match(row, /8\.6%.*98\.9%/);
+    if (width === 30) assert.doesNotMatch(row, /17\.2K/);
+    if (width >= 55) assert.match(row, /17\.2K/);
+  }
+});
+
 test('official contract uses explicit occupancy and current cache count, never cumulative counters', () => {
   const metrics = normalize(sample);
   assert.equal(metrics.context.usedPercentage, 14.24);
@@ -34,10 +152,10 @@ test('zero, missing and malformed values remain distinct; compaction and model s
   const zero = normalize({ context_window: { used_percentage: 0, current_usage: { cache_read_input_tokens: 0 } },
     quota: { 'gemini-5h': { remaining_fraction: 0 } } });
   const text = render(zero, { color: false });
-  assert.match(text, /Context 0%/); assert.match(text, /Cache read 0/); assert.match(text, /left\s+5h 0%/);
+  assert.match(text, /Context 0%/); assert.match(text, /Cache -- · 0 read/); assert.match(text, /left\s+5h 0%/);
   const missing = normalize({ model: { id: 'Claude' }, context_window: { used_percentage: '50', current_usage: { cache_read_input_tokens: -1 } } });
   assert.equal(missing.context.usedPercentage, null); assert.equal(missing.cacheReadTokens, null);
-  assert.match(render(missing, { color: false }), /Context --.*Cache read --.*Quota --/s);
+  assert.match(render(missing, { color: false }), /Context --.*Cache --.*Quota --/s);
   assert.equal(normalize({ context_window: { used_percentage: 2 } }).context.usedPercentage, 2);
   assert.equal(normalize({ context_window: { used_percentage: 120 } }).context.usedPercentage, 120);
   assert.equal(normalize({ context_window: { remaining_percentage: 70 } }).context.usedPercentage, 30);
@@ -72,7 +190,7 @@ test('primary metrics stay on the first row; quota families and windows have sta
   } });
   for (const width of [55, 80, 100, 120]) {
     const rows = render(metrics, { width, color: false }).split('\n');
-    assert.match(rows[0], /Context 14\.2%.*Cache read 20\.9K/);
+    assert.match(rows[0], /Context 14\.2%.*Cache -- · 20\.9K read/);
     assert.doesNotMatch(rows[0], /Gemini|Claude|reset/);
     assert.match(rows[1], /^Gemini\s+left\s+5h 100%.*week 95%/);
     assert.match(rows[2], /^Claude\/GPT\s+left\s+5h 45%.*week 8% !/);
@@ -82,12 +200,14 @@ test('primary metrics stay on the first row; quota families and windows have sta
 });
 
 test('ANSI foreground and weight distinguish key values, alerts and secondary metadata without backgrounds', () => {
-  const metrics = normalize({ ...sample, context_window: { used_percentage: 95, current_usage: { cache_read_input_tokens: 24000 } },
+  const metrics = normalize({ ...sample, version: '1.3.2', model: { id: 'claude-sonnet-4-6' },
+    context_window: { used_percentage: 95, current_usage: { input_tokens: 6000, cache_read_input_tokens: 24000, cache_creation_input_tokens: 0 } },
     quota: { 'gemini-5h': { remaining_fraction: 0.08, reset_in_seconds: 3600 } } });
   const colored = render(metrics, { color: true, width: 120 });
   const plain = render(metrics, { color: false, width: 120 });
   assert.match(colored, /\x1b\[1;31m95%/);
-  assert.match(colored, /\x1b\[1;35m24K/);
+  assert.match(colored, /\x1b\[1;35m80%/);
+  assert.match(colored, /\x1b\[2;39m · 24K read/);
   assert.match(colored, /\x1b\[1;31m8%/);
   assert.match(colored, /\x1b\[2;39m.*↻/);
   assert.equal(colored.replace(/\x1b\[[\d;]+m/g, ''), plain);

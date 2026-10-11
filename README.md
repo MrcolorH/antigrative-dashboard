@@ -7,7 +7,7 @@
 Token throughput, cache hits and context usage in the model selector row. Hover over context for five-hour and weekly quotas too.<br>
 Keep the summary visible. Hover for the details.
 
-[![Version 0.8.0](https://img.shields.io/badge/version-0.8.0-91adff?style=flat-square&labelColor=252936)](CHANGELOG.md)
+[![Version 0.8.1](https://img.shields.io/badge/version-0.8.1-91adff?style=flat-square&labelColor=252936)](CHANGELOG.md)
 [![Platforms](https://img.shields.io/badge/host-Windows%20%7C%20Linux%20%7C%20macOS-83d8b9?style=flat-square&labelColor=252936)](COMPATIBILITY.md)
 [![Antigravity 2.21.1 / 2.22.0](https://img.shields.io/badge/Antigravity-2.21.1%20%2F%202.22.0-c5a0ff?style=flat-square&labelColor=252936)](COMPATIBILITY.md)
 [![MIT](https://img.shields.io/badge/license-MIT-d4d9e6?style=flat-square&labelColor=252936)](LICENSE)
@@ -16,7 +16,7 @@ Keep the summary visible. Hover for the details.
 
 </div>
 
-**v0.8.0:** Local Token usage with daily/weekly activity and model charts by day, week and month; first-use guidance; TPS timing-quality checks for [#8](https://github.com/YOU-SHOULD-KNOW-ME/antigrative-dashboard/issues/8); and stable usage-window/hover interactions. Shared by the desktop App and standalone IDE. [Full release notes](https://github.com/YOU-SHOULD-KNOW-ME/antigrative-dashboard/releases/tag/v0.8.0).
+**v0.8.1:** Fix Teamwork and nested subagent mounting/working-state visibility for [#9](https://github.com/YOU-SHOULD-KNOW-ME/antigrative-dashboard/issues/9), restore clickable usage windows and synchronized languages after remount, and add tested current-request CLI cache percentages. [Full release notes](https://github.com/YOU-SHOULD-KNOW-ME/antigrative-dashboard/releases/tag/v0.8.1).
 
 ## Preview
 
@@ -57,6 +57,7 @@ Keep the summary visible. Hover for the details.
 - **Actual account data.** Remaining quota comes from the account API, not an estimate based on text length. Expired windows do not automatically become 100%.
 - **Conversation-aware.** Switch chats without carrying the previous chat's throughput into a new one.
 - **Subagent-aware.** Show the current child's speed, cache and context beside its input box. Detail cards distinguish child statistics from shared account quotas. Navigation refreshes immediately; late results cannot overwrite another visit's data.
+- **Teamwork compatibility (v0.8.1).** Keep the strip through send/stop/cancel transitions and support deeply nested static agent badges. Conversation IDs come from the current input's DOM owner when available, including switches without a URL change. Hidden/inert or deeper editors are ignored; ambiguous visible inputs/badges are not guessed. Six-level English/Chinese browser fixtures pass, including usage remount and context-to-usage language synchronization. Windows real three-level delegation was checked with independent metrics, return navigation and a generating-state screenshot; this host changed its URL at each level and rendered one composer. Same-URL/six-level DOM cases remain fixture coverage; signed-in Linux/macOS GUI checks are still pending.
 - **Survives updates.** Plugin-owned runtime attachment reconnects after app updates, without modifying the application archive.
 - **Persistent conversations.** TPS and cache statistics are saved separately for each conversation and account; reloads can recover saved statistics.
 - **Compact-window support.** Full statistics reduce to three clickable icons (speed, cache and context) when space is limited. Hover or click for details; language switching stays available in the context card. The strip hides only if the icons cannot fit safely and restores when space returns. Message controls hidden behind the composer do not cause scroll flicker.
@@ -67,7 +68,7 @@ Keep the summary visible. Hover for the details.
 ## Antigravity IDE
 
 **v0.7.0** adds a separate VSIX for Google's own standalone IDE. Download
-`antigrative-dashboard-ide-0.8.0.vsix` from the release and choose **Install from VSIX…**
+`antigrative-dashboard-ide-0.8.1.vsix` from the release and choose **Install from VSIX…**
 in the IDE's Extensions view. No desktop App installation is required.
 
 Fully quit the IDE, then start it with
@@ -82,7 +83,7 @@ See [IDE installation, update, diagnostics and data cleanup](ide/README.md).
 
 ## Antigravity CLI status line
 
-Available in **v0.6.0**: an independent adapter for the official Antigravity CLI `statusLine` interface displays context occupancy, cache read tokens, state and grouped quotas, with English/Chinese and terminal-width adaptation. Remaining quota numbers and bars are **green ≥70%, yellow ≥30% and <70%, red <30%**. Preview: `node cli/statusline.mjs --preview`; install: `python manage.py install-cli` (Linux/macOS: `python3`). Requires Node.js 20+ and a CLI supporting the interface. CLI tok/s needs streaming-duration data absent from the documented payload. See [CLI usage and rollback](docs/CLI.md).
+Available in **v0.6.0**: an independent adapter for the official Antigravity CLI `statusLine` interface displays context occupancy, cache read tokens, state and grouped quotas, with English/Chinese and terminal-width adaptation. Remaining quota numbers and bars are **green ≥70%, yellow ≥30% and <70%, red <30%**. Preview: `node cli/statusline.mjs --preview`; install: `python manage.py install-cli` (Linux/macOS: `python3`). Requires Node.js 20+ and a CLI supporting the interface. Version 0.8.1 prioritizes current-request cache percentage for tested CLI 1.3.2/1.3.3 Sonnet 4.6 and GPT-OSS 120B counters, plus Gemini 3.8 Flash (High) on CLI 1.3.3, with zero cache writes; unknown cases stay unavailable. CLI tok/s needs streaming-duration data absent from the documented payload. See [CLI usage and rollback](docs/CLI.md).
 
 ![Real Antigravity CLI conversation with the dashboard](docs/assets/cli-conversation.png)
 
@@ -134,8 +135,9 @@ Repository: https://github.com/YOU-SHOULD-KNOW-ME/antigrative-dashboard
    - App: check python manage.py status, then python manage.py install.
    - CLI: check agy --version and Node.js 20+, then python manage.py install-cli.
      Do not run manage.py install. Preserve any existing statusLine using the
-     documented backup/override flow. Do not claim CLI tok/s, cache ratio or local
-     usage charts: those desktop metrics are not available through this adapter.
+     documented backup/override flow. CLI cache percentage is conditional; check
+     docs/CLI.md for tested models/versions and unavailable values. Do not claim
+     CLI tok/s or local usage charts: they are not available through this adapter.
    - Standalone IDE: install the release VSIX through Install from VSIX... or
      ide/manage.py install --exe <verified-IDE-executable> --vsix <release-VSIX>.
      It does not require the desktop App; do not run the App installer.

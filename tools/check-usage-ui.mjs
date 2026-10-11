@@ -24,7 +24,24 @@ const page=await browser.newPage({viewport:{width:1280,height:900}}),errors=[];p
 const screenshot=page.screenshot.bind(page);page.screenshot=options=>screenshot({...options,path:ide?options.path.replace('fixture-','ide-fixture-'):options.path});
 await mkdir(join(repo,'.data/usage'),{recursive:true});
 try{
- await page.goto(`http://127.0.0.1:${server.address().port}`);await page.locator('[data-card=cache]').click();await page.locator('#open-usage').click();assert.equal(await page.locator('#usage-dashboard').evaluate(n=>n.open),true);
+ await page.goto(`http://127.0.0.1:${server.address().port}`);
+ // Navigation can briefly leave no discoverable composer while usage is
+ // closed. Its restored entry must still own a functional, localized dialog.
+ await page.locator('#usage-dashboard').waitFor({state:'attached'});
+ await page.evaluate(()=>document.querySelector('.rounded-composer').style.display='none');
+ await page.locator('#ag-pulse-status-bar').waitFor({state:'detached'});
+ await page.evaluate(()=>document.querySelector('.rounded-composer').style.display='');
+ await page.locator('[data-card=cache]').waitFor({state:'visible'});
+ assert.equal(await page.locator('#usage-dashboard').count(),1,'Restored composer must recreate the usage controller');
+ for(const [choice,label,title] of [['en','View token usage','Token usage'],['zh','查看用量统计','用量统计']]){
+  await page.locator('[data-card=context]').click();await page.locator(`#card-language-${choice}`).click();
+  await page.waitForFunction(label=>document.getElementById('ag-pulse-status-bar').shadowRoot.getElementById('usage-open-label').textContent===label,label);
+  await page.locator('[data-card=cache]').click();await page.locator('#open-usage').click();
+  assert.equal(await page.locator('#usage-dashboard').evaluate(n=>n.open),true);
+  assert.equal(await page.locator('#title').textContent(),title);
+  await page.locator('#usage-dashboard #close').click();
+ }
+ await page.locator('[data-card=cache]').click();await page.locator('#open-usage').click();assert.equal(await page.locator('#usage-dashboard').evaluate(n=>n.open),true);
  assert.equal(await page.locator('.usage-summary>div').count(),2,'Desktop and IDE share the two-column usage entry');
  assert.deepEqual(await page.locator('.usage-unit').allTextContents(),['Token','Token']);
  assert.equal(await page.locator('#cache-card').evaluate(n=>n.hidden),true);assert.equal(await page.locator('#title').textContent(),'用量统计');

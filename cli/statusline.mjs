@@ -45,9 +45,9 @@ async function input() {
 
 function preview() {
   return {
-    model: { display_name: 'Gemini 3.5 Flash (High)' }, agent_state: 'working', terminal_width: 100,
+    version: '1.3.2', model: { id: 'claude-sonnet-4-6', display_name: 'Claude Sonnet 4.6 (Thinking)' }, agent_state: 'working', terminal_width: 100,
     context_window: { used_percentage: 44.2, context_window_size: 1048576,
-      current_usage: { input_tokens: 63382, output_tokens: 346, cache_read_input_tokens: 20857, cache_creation_input_tokens: 0 } },
+      current_usage: { input_tokens: 190, output_tokens: 346, cache_read_input_tokens: 17244, cache_creation_input_tokens: 0 } },
     quota: { 'gemini-5h': { remaining_fraction: 0.72, reset_in_seconds: 8100 },
       'gemini-weekly': { remaining_fraction: 0.9378, reset_in_seconds: 560580 } },
   };

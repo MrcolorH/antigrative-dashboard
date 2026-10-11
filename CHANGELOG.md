@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.8.1 — 2026-10-12
+
+- Address [#9](https://github.com/YOU-SHOULD-KNOW-ME/antigrative-dashboard/issues/9) in the App runtime adapter: retain the widget during send/stop/cancel transitions, discover static Teamwork badges without title/span assumptions, and scope visible editors/model controls to their nearest composer owner. Ignore hidden/inert and deeper nested editors; reject ambiguous anchors.
+- Recreate the usage controller after a closed-dialog composer teardown, rather than reattaching a strip whose dialog was already disposed. Invalidate pending requests from that mount. Context language choices update usage-entry labels immediately and keep the usage dialog localized. Desktop/IDE browser regressions cover temporary missing composers; English/Chinese Teamwork fixtures cover main/subagent return navigation and clickable localized usage windows after remount.
+- Follow the active composer's nearest `data-cascade-id` when nested navigation leaves the route unchanged. Invalid explicit IDs clear conversation statistics rather than inheriting the parent route; late responses remain isolated. Add English/Chinese production-browser regressions for six nesting levels, working controls, DOM-only navigation and ambiguity. Windows signed-in three-level delegation checks cover independent metrics, return navigation and a generating-state screenshot. That host changes the route and renders one composer, so six-level DOM and unchanged-route coverage remain browser fixtures. User acceptance and Linux/macOS GUI checks remain open.
+- Prioritize current-request cache-read percentage in the CLI status line, with read tokens as secondary text. Narrow terminals retain context/cache percentages before bars, read counts and state. Keep unknown counter semantics unavailable and expose the reason in allowlisted JSON.
+- Calculate percentages only for empirically tested CLI/model counter scopes with zero cache writes; explicitly zero reads with valid nonempty input show 0%. Do not use output, cumulative totals, another request's percentage or desktop history.
+- Enable nonzero Gemini 3.8 Flash (High) cache percentages on CLI 1.3.3 after diagnosing a real current-request snapshot with reads greater than input. Earlier previews omitted this model even when reads were available; short artificial Gemini tests returning zero do not establish nonzero-cache support by themselves.
+- Do not report busy zero-cache snapshots as completed 0% hits. Thinking/working/tool/initializing with zero reads display `Cache --` without `0 read`; available nonzero reads remain usable while busy, and idle valid zero reads still show 0%. No percentage is borrowed from previous requests. Windows and Linux CLI regressions cover both languages and separate status-line processes.
+
 ## 0.8.0 — 2026-10-11
 
 - Make English/Chinese agent installation prompts detect the host and require target confirmation before downloads/configuration changes. Distinguish App, CLI and standalone IDE; the shared ZIP does not mean the App installer should run for CLI users.

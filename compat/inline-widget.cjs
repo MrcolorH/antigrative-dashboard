@@ -52,7 +52,15 @@ module.exports = function installAgPulseInlineWidget() {
   const attribute=(element,name,value)=>{if(value===null){if(element.hasAttribute(name))element.removeAttribute(name);}else if(element.getAttribute(name)!==String(value))element.setAttribute(name,String(value));};
   const style=(element,name,value)=>{if(element.style.getPropertyValue(name)!==value)element.style.setProperty(name,value);};
   const hidden=(element,value)=>{if(element.hidden!==value)element.hidden=value;};
-  const conversationId=()=>surface?surface.conversationId(composer):location.pathname.match(/\/c\/([0-9a-f-]{36})/i)?.[1]||null;
+  const GUID=/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+  const conversationId=()=>{
+    if(surface)return surface.conversationId(composer);
+    // Nested agents need not change the main window route. Read only the
+    // nearest owner of this exact composer, never a sidebar/global chat ID.
+    const owner=(composer?.box||composer?.row)?.closest('[data-cascade-id]');
+    if(owner){const id=owner.getAttribute('data-cascade-id');return GUID.test(id||'')?id:null;}
+    return location.pathname.match(/\/c\/([0-9a-f-]{36})/i)?.[1]||null;
+  };
   function syncConversation(){
     const id=conversationId();
     if(id===lastConversation)return false;
@@ -71,6 +79,9 @@ module.exports = function installAgPulseInlineWidget() {
     for(const e of root.querySelectorAll('[data-i18n-aria][title]'))attribute(e,'title',t(e.dataset.i18nAria));
     for(const button of root.querySelectorAll('[data-language-choice]')){attribute(button,'aria-pressed',button.dataset.languageChoice===language.language);attribute(button,'data-save-failed',preferences.error);attribute(button,'title',preferences.error?t('languageSaveFailed'):button.textContent);}
     text('language-save-note',preferences.error?t('languageSaveFailed'):'');
+    const zh=language.language==='zh-CN';
+    text('usage-today-label',zh?'今日用量':'Today');text('usage-month-label',zh?'本月用量':'This month');
+    text('usage-open-label',zh?'查看用量统计':'View token usage');
     updateGuide();
   }
   function stopDensityMotion(){
@@ -223,16 +234,24 @@ module.exports = function installAgPulseInlineWidget() {
     densityFrame=next;
     updateGuide();
   }
+  function badgeTextRects(badge){
+    if(!badge?.isConnected)return [];
+    const walker=document.createTreeWalker(badge,NodeFilter.SHOW_TEXT),range=document.createRange(),rects=[];
+    for(let text=walker.nextNode();text;text=walker.nextNode()){
+      if(!text.textContent.trim()||text.parentElement?.closest('svg,[hidden],[inert]')||getComputedStyle(text.parentElement).visibility==='hidden')continue;
+      range.selectNodeContents(text);rects.push(...range.getClientRects());
+    }
+    return rects.filter(r=>r.width>0&&r.height>0);
+  }
   function captureNative(found){
     const branch=found.branch,r=branch.getBoundingClientRect();
     const baseline={height:r.height,icons:Array.from(branch.querySelectorAll('svg')).map(icon=>({icon,width:icon.getBoundingClientRect().width})),reserve:0};
     if(found.kind==='ide')baseline.reserve=surface.nativeReserve(found);
     if(found.kind==='subagent'){
-      const badge=found.anchor,style=getComputedStyle(badge),label=badge.querySelector('span'),range=document.createRange();
-      range.selectNodeContents(label);
+      const badge=found.anchor,style=getComputedStyle(badge);
       // Summed glyph fragments recover intrinsic text width even if the host
       // is already wrapping the badge when we first attach.
-      const textWidth=Array.from(range.getClientRects()).reduce((sum,rect)=>sum+rect.width,0);
+      const textWidth=badgeTextRects(badge).reduce((sum,rect)=>sum+rect.width,0);
       const iconWidth=badge.querySelector('svg')?.getBoundingClientRect().width||0;
       const natural=textWidth+Math.max(iconWidth,12)+(parseFloat(style.columnGap)||0)+(parseFloat(style.paddingLeft)||0)+(parseFloat(style.paddingRight)||0);
       baseline.reserve=Math.ceil(Math.max(badge.getBoundingClientRect().width,natural)+badge.getBoundingClientRect().left-r.left+(parseFloat(getComputedStyle(branch).paddingRight)||0));
@@ -247,8 +266,7 @@ module.exports = function installAgPulseInlineWidget() {
     if(composer.kind==='ide'&&composer.branch.getBoundingClientRect().width<baseline.reserve-1)return false;
     if(composer.kind==='subagent'){
       if(composer.branch.getBoundingClientRect().width<baseline.reserve-1)return false;
-      const range=document.createRange();range.selectNodeContents(composer.anchor.querySelector('span'));
-      const lines=new Set(Array.from(range.getClientRects()).filter(r=>r.width>0).map(r=>Math.round(r.top)));
+      const lines=new Set(badgeTextRects(composer.anchor).map(r=>Math.round(r.top)));
       if(lines.size>1)return false;
     }
     return true;
@@ -396,7 +414,9 @@ module.exports = function installAgPulseInlineWidget() {
     const stableModels=Array.from(document.querySelectorAll('[data-testid="model-selector-trigger"]')).filter(visible);
     const models=stableModels.length?stableModels:Array.from(document.querySelectorAll('button[role="combobox"][aria-haspopup],button[aria-label^="Select model"]')).filter(visible);
     const pairs=[];
+    const ownsEditor=(element,editor)=>element.closest('[data-testid="agent-input-box"]')===editor.closest('[data-testid="agent-input-box"]');
     for(const model of models)for(const editor of editors){
+      if(!ownsEditor(model,editor))continue;
       let row=model.parentElement,distance=1;
       // The toolbar branch and editable branch meet at their nearest common
       // composer ancestor. Action-button labels and generation state are irrelevant.
@@ -404,7 +424,7 @@ module.exports = function installAgPulseInlineWidget() {
       if(!row||row===document.body||row.contains(editor)||!row.parentElement?.contains(editor)||[document.body,document.documentElement].includes(row.parentElement))continue;
       for(let element=editor;element&&element!==row.parentElement;element=element.parentElement)distance++;
       let branch=model;while(branch.parentElement!==row)branch=branch.parentElement;
-      const pair={editor,model,row,branch,distance,kind:'main'};
+      const pair={editor,model,row,branch,box:editor.closest('[data-testid="agent-input-box"]'),distance,kind:'main'};
       if(composerLayout(pair))pairs.push(pair);
     }
     // Subagents have a static identity badge instead of a model selector.
@@ -412,22 +432,36 @@ module.exports = function installAgPulseInlineWidget() {
     // never use the auxiliary pane's arbitrary comboboxes as an anchor.
     for(const editor of editors){
       const box=editor.closest('[data-testid="agent-input-box"]');
-      if(!box||!visible(box)||box.querySelectorAll('[contenteditable="true"]').length!==1||box.querySelector('[data-testid="model-selector-trigger"]'))continue;
-      for(const send of box.querySelectorAll('[data-testid="send-button"]')){
+      if(!box||!visible(box))continue;
+      const owned=e=>e.closest('[data-testid="agent-input-box"]')===box;
+      const activeEditors=Array.from(box.querySelectorAll('[contenteditable="true"]')).filter(e=>owned(e)&&visible(e));
+      if(!activeEditors.includes(editor)||activeEditors.length!==1)continue;
+      if(Array.from(box.querySelectorAll('[data-testid="model-selector-trigger"]')).some(e=>owned(e)&&visible(e)))continue;
+      const controls=Array.from(box.querySelectorAll('[data-testid="send-button"],[data-tooltip-id*="send-button"],[data-testid="stop-button"],[data-testid="cancel-button"],button[aria-label]'))
+        .filter(e=>owned(e)&&visible(e)&&(e.hasAttribute('data-testid')&&/^(send|stop|cancel)-button$/.test(e.dataset.testid)||e.getAttribute('data-tooltip-id')?.includes('send-button')||/^(?:cancel|stop|取消|停止)(?:\b|\s|生成|任务|响应|$)/i.test(e.getAttribute('aria-label')||'')));
+      for(const send of controls){
         let row=send.parentElement,distance=1;
         while(row?.parentElement&&row.parentElement!==box&&!row.parentElement.contains(editor)){row=row.parentElement;distance++;}
         if(!row||row.contains(editor)||!row.parentElement?.contains(editor)||!box.contains(row))continue;
-        const anchors=Array.from(row.querySelectorAll('[title]')).filter(e=>visible(e)&&e.querySelector('svg')&&e.querySelector('span')&&!e.matches('button,a,[role="button"],[role="combobox"],[aria-haspopup]')&&!e.querySelector('button,a,[role="button"],[aria-haspopup]'));
+        // The smallest static icon+text badge is structural evidence, even
+        // without title/span. Icon-only controls and ambiguous badges fail closed.
+        const interactive='button,a,input,select,[contenteditable="true"],[role="button"],[role="combobox"],[aria-haspopup]';
+        const candidates=Array.from(row.querySelectorAll('*')).filter(e=>owned(e)&&visible(e)&&e.id!==ID&&!e.closest('#'+ID)&&e.querySelector('svg')&&badgeTextRects(e).length&&!e.contains(send)&&!send.contains(e)&&!e.matches(interactive)&&!e.closest(interactive)&&!e.querySelector(interactive));
+        const anchors=candidates.filter(e=>!candidates.some(other=>other!==e&&e.contains(other)));
         if(anchors.length!==1)continue;
         const anchor=anchors[0];let branch=anchor;while(branch.parentElement!==row)branch=branch.parentElement;
         if(branch.contains(send))continue;
         for(let element=editor;element&&element!==row.parentElement;element=element.parentElement)distance++;
-        const pair={editor,model:null,row,branch,anchor,distance,kind:'subagent'};
-        if(composerLayout(pair))pairs.push(pair);
+        const pair={editor,model:null,row,branch,anchor,box,distance,kind:'subagent'};
+        if(composerLayout(pair)&&!pairs.some(p=>p.editor===editor&&p.row===row&&p.branch===branch))pairs.push(pair);
       }
     }
     pairs.sort((a,b)=>a.distance-b.distance);
     if(!pairs.length)return null;
+    const focused=pairs.filter(pair=>pair.editor===document.activeElement||pair.editor.contains(document.activeElement));
+    if(focused.length===1)return focused[0];
+    const retained=pairs.filter(pair=>pair.branch===composer?.branch&&pair.editor===composer?.editor);
+    if(retained.length===1)return retained[0];
     // Equally plausible visible composers must not place the strip arbitrarily.
     const closest=pairs.filter(pair=>pair.distance===pairs[0].distance);
     if(closest.length===1)return closest[0];
@@ -442,8 +476,18 @@ module.exports = function installAgPulseInlineWidget() {
       return;
     }
     const found=findComposer();
-    if(!found){stopDensityMotion();densityFrame=null;densityProbe=null;composer=null;resizeObserver?.disconnect();if(node){hide();usageDashboard?.dispose();usageDashboard=null;themeController?.dispose();themeController=null;node.remove();}return;}
-    found.native=composer?.branch===found.branch?composer.native:captureNative(found);
+    if(!found){
+      stopDensityMotion();densityFrame=null;densityProbe=null;composer=null;resizeObserver?.disconnect();
+      if(node){
+        hide();usageDashboard?.dispose();usageDashboard=null;themeController?.dispose();themeController=null;
+        node.remove();node=null;root=null;
+        // A disposed dialog cannot be reused with its old strip/listeners.
+        // Invalidate this mount's pending requests and rebuild on discovery.
+        requestEpoch++;pending=false;refreshRequest=null;manualRequest=null;lastFetch=0;
+      }
+      return;
+    }
+    found.native=composer?.branch===found.branch&&composer?.anchor===found.anchor?composer.native:captureNative(found);
     if(found.kind==='ide')found.native.reserve=surface.nativeReserve(found);
     composer=found;
     if(syncConversation())render();
@@ -564,8 +608,7 @@ module.exports = function installAgPulseInlineWidget() {
     syncConversation();
     if(usageDashboard){
       const available=Boolean(data.usage);hidden($('usage-entry'),!available);
-      const zh=language.language==='zh-CN';text('usage-today-label',zh?'今日用量':'Today');text('usage-month-label',zh?'本月用量':'This month');
-      text('usage-today',compact(data.usage?.todayTokens));text('usage-month',compact(data.usage?.monthTokens));text('usage-open-label',zh?'查看用量统计':'View token usage');usageDashboard.update(data.usage);
+      text('usage-today',compact(data.usage?.todayTokens));text('usage-month',compact(data.usage?.monthTokens));usageDashboard.update(data.usage);
     }
     if(groupMenu)return;
     const groups=data.groups||[],model=composer?.model?.getAttribute('aria-label')||composer?.model?.textContent||data.speed?.model||'';
@@ -656,7 +699,7 @@ module.exports = function installAgPulseInlineWidget() {
     })();
     return refreshRequest;
   }
-  const observer=new MutationObserver(records=>{if(records.some(record=>record.target!==node&&!node?.contains(record.target)))scheduleLayout();});observer.observe(document.documentElement,{childList:true,subtree:true,attributes:true,attributeFilter:['style','class','hidden','inert','data-cascade-id']});
+  const observer=new MutationObserver(records=>{if(records.some(record=>record.target!==node&&!node?.contains(record.target)))scheduleLayout();});observer.observe(document.documentElement,{childList:true,subtree:true,attributes:true,attributeFilter:['style','class','hidden','inert','data-cascade-id','data-testid','data-tooltip-id','aria-label','role','contenteditable']});
   const onKey=e=>{if(e.key==='Escape')hide();}, onPointer=e=>{if(node&&!e.composedPath().includes(node))hide();};
   document.addEventListener('keydown',onKey);document.addEventListener('pointerdown',onPointer);
   window.addEventListener('resize',scheduleLayout);document.addEventListener('scroll',scheduleLayout,true);

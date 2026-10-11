@@ -1,44 +1,45 @@
-# Antigrative Dashboard v0.8.0
+# Antigrative Dashboard v0.8.1
 
-## Local Token usage for the App and standalone IDE
+## Teamwork and nested subagents — Issue #9
 
-- Open the database/cache card and choose **View token usage**. Daily/weekly contribution grids and model charts by day, week and month show local recorded consumption, with model filtering and exact-count tables.
-- Colors follow the host theme, accent and background. Custom year menus, stable window geometry, aligned controls and K/M/B formatting keep the interface consistent.
-- The cache card includes a compact two-column **Today / This month** summary.
-- First-use guidance explains local history import, incomplete coverage, UTC+8 date boundaries, storage and deletion. Acknowledgment survives restarts and language/theme changes; failed saves offer retry.
-- Records are isolated by account. Available local history is imported and repeated requests are deduplicated. Deleting a conversation does not subtract previously recorded usage. Only numeric metadata and hashed identities are retained; prompts, replies and credentials are not stored.
-- This is local observed usage, not an account bill. The desktop App and IDE use separate ledgers; missing/deleted history cannot be reconstructed.
+- Match the active composer's own visible editor and controls. Ignore hidden/inert editors and descendants owned by deeper agent inputs.
+- Recognize send, stop, cancel, tooltip and English/Chinese ARIA control semantics. Generation no longer invalidates the composer solely because its action button changes.
+- Discover static icon/text badges without requiring title/span; measure painted text safely and reject ambiguous anchors.
+- Prefer the current composer's nearest valid data-cascade-id over the parent route. Invalid explicit IDs clear conversation statistics; late responses cannot overwrite the current agent's metrics.
 
-## TPS timing quality - Issue #8
+## Usage-window lifecycle and language fixes
 
-- Match output counters to request timing, reject conflicting duplicate/retry summaries, and quarantine conservative short tool-only and same-model statistical outliers.
-- Preserve ordinary short responses and sustained high speeds. There is no fixed speed cap, fabricated duration or TTFT added to the streaming denominator.
-- Show uncertain latest timing as unavailable instead of reusing an earlier speed. Token usage, cache and context remain available independently.
-- Recalculate legacy saved rates when complete trajectories become readable. The host API does not expose chunk timing, so exact server generation time and buffering cannot be reconstructed.
+- Recreate the strip and usage controller together after a closed-dialog composer teardown. Fix **View token usage** becoming unresponsive after subagent navigation.
+- Invalidate pending requests from discarded mounts.
+- Context language choices update Today / This month / View token usage immediately and keep the statistics window synchronized.
+- Preserve an already-open account usage window across composer replacement and pointer/keyboard hover dismissal when returning to chat.
 
-See [TPS policy](https://github.com/YOU-SHOULD-KNOW-ME/antigrative-dashboard/blob/v0.8.0/docs/TPS.md) and [usage accounting and cleanup](https://github.com/YOU-SHOULD-KNOW-ME/antigrative-dashboard/blob/v0.8.0/docs/USAGE.md).
+## CLI current-request cache percentages
 
-## Interaction fixes
+- Prioritize cache percentage, with read tokens as secondary text when terminal width permits.
+- Support empirically checked CLI 1.3.2/1.3.3 Sonnet 4.6 and GPT-OSS 120B scopes, plus CLI 1.3.3 Gemini 3.8 Flash (High), with zero cache writes. Use cacheRead / (input + cacheRead) for these scopes.
+- Busy/tool/initializing zero-cache snapshots show **Cache --**, instead of treating temporary zero counters as completed 0% hits. Valid idle zero reads still show 0%; available nonzero busy counters remain usable.
+- Unknown semantics remain unavailable. Do not borrow a previous request's percentage or include output tokens in the denominator.
 
-- Revise agent installation guidance: detect the OS and host, confirm App/CLI/standalone IDE before downloading or changing settings, and use only the selected adapter. App and CLI share the ZIP but use separate installers; IDE uses VSIX.
-- Keep the usage window open across polling, temporary missing snapshots and composer replacement; account switches clear stale displayed data.
-- Queue manual refresh behind polling and complete its visible rotation.
-- Restore pointer and keyboard focus correctly when closing usage. Hover cards auto-dismiss after the pointer leaves.
-- Update English/Chinese README previews using the latest production widget and clearly labeled illustrative data.
+See [CLI counter semantics](https://github.com/YOU-SHOULD-KNOW-ME/antigrative-dashboard/blob/v0.8.1/docs/CLI.md). CLI tok/s still requires streaming-duration data absent from the documented payload.
 
-## Downloads
+## Downloads and update
 
-- **Desktop App / CLI:** `antigrative-dashboard-0.8.0.zip` and `.zip.sha256`. Extract and run `python manage.py install` for the App or `python manage.py install-cli` for the CLI. Use `python3` on Linux/macOS. The CLI feature set is unchanged.
-- **Standalone Antigravity IDE:** `antigrative-dashboard-ide-0.8.0.vsix` and `.vsix.sha256`. Choose **Install from VSIX...** in Extensions. Fully quit, then start with `--remote-debugging-port=0 --remote-debugging-address=127.0.0.1`; retain these flags on subsequent launches.
+- **App / CLI:** antigrative-dashboard-0.8.1.zip and .zip.sha256. Extract and run `python manage.py install` for App or `python manage.py install-cli` for CLI. Use python3 on Linux/macOS. Confirm your host before choosing the installer.
+- **Standalone Antigravity IDE:** antigrative-dashboard-ide-0.8.1.vsix and .vsix.sha256. Use **Install from VSIX...** and retain the documented loopback remote-debugging launch flags.
 
-Updates retain the plugin identity, preferences and saved statistics. IDE users do not need the desktop App. VS Code, Visual Studio, JetBrains, Zed and Xcode integrations are not supported.
+Plugin identity, preferences and recorded usage are retained. Shared usage fixes are included in the IDE package; desktop Teamwork discovery belongs to the App adapter. VS Code, Visual Studio, JetBrains, Zed and Xcode integrations remain unsupported.
 
-**Verification scope:** real local Windows App/IDE use plus automated data, lifecycle, package and Chromium regressions. Publication requires Windows/Linux/macOS CI and official desktop resource checks. Signed-in Linux/macOS GUI acceptance remains outstanding. README figures illustrate the desktop widget and are not live IDE screenshots.
+## Verification scope
+
+Windows real App checks cover main-to-three-level subagent delegation, independent metrics, return navigation and a generating-state screenshot. Real App usage checks confirm opening and English/Chinese synchronization. Chromium regressions cover six-level nested DOM, unchanged-route ownership, working controls, late responses, ambiguity and main/subagent usage remounts. Shared usage tests cover App and IDE, including Trusted Types.
+
+CLI numerical tests cover Windows and Linux, with tested server CLI/model samples. Publication is gated by Windows/Linux/macOS data, lifecycle, Chromium, package and official desktop resource checks. Signed-in Linux/macOS GUI acceptance remains outstanding; fixtures do not establish support for every future host layout.
 
 ## 中文摘要
 
-本版为桌面 App 和独立 Antigravity IDE 增加本地 Token 用量统计：每日／每周活动格、按模型区分的天／周／月柱状图、主题配色和首次使用提示。缓存卡提供今日／本月入口。统计自动汇总可读取的本地历史，按请求去重；不保存对话正文，删除对话不会扣除已经记录的用量。这些统计不是账户账单，App 与 IDE 分开保存。
+修复 Issue #9：Teamwork 与多层子代理的输入框定位、生成时控件消失、无 title/span 徽章异常，以及子代理会话归属和旧请求串数据问题。额外修复切换子代理后「查看用量统计」失效，以及从上下文详情切换中英文后用量入口和统计页面不同步。
 
-针对 Issue #8 加强 Token 与耗时配对，隔离计时可疑的样本，保留正常短回复与持续高速输出，不设置固定速率上限。异常计时不影响 Token、缓存或上下文统计。
+CLI 新增已实测口径的当前请求缓存率；运行或工具执行期间的临时零值显示「Cache --」，不再误报完成请求的 0%。未知口径保留不可用，不借用上一轮数据。
 
-同时修复用量窗口偶发消失、刷新动效不稳定、关闭统计页后悬浮卡不收起等问题，并更新中英文演示图。CLI 功能保持原有范围。Windows 本地已实测；Linux/macOS 有自动化覆盖，登录后 GUI 仍待实机验收。
+提供 App/CLI ZIP 与独立 IDE VSIX，保留已有偏好和用量记录；其他编辑器扩展尚未兼容。

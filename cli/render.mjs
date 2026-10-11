@@ -25,10 +25,10 @@ export function truncate(text, width) {
 }
 
 const labels = {
-  en: { context: 'Context', cache: 'Cache read', capacity: 'Capacity', created: 'Cache write', input: 'Input', output: 'Output',
+  en: { context: 'Context', shortContext: 'Ctx', cache: 'Cache', read: 'read', capacity: 'Capacity', created: 'Cache write', input: 'Input', output: 'Output',
     left: 'left', reset: 'reset', quota: 'Quota', week: 'week', unknown: 'Unknown', idle: 'Ready', thinking: 'Thinking',
     working: 'Working', tool_use: 'Tool', initializing: 'Starting' },
-  'zh-CN': { context: '上下文', cache: '缓存读取', capacity: '容量', created: '缓存写入', input: '输入', output: '输出',
+  'zh-CN': { context: '上下文', shortContext: '上下文', cache: '缓存', read: '读取', capacity: '容量', created: '缓存写入', input: '输入', output: '输出',
     left: '剩余', reset: '重置', quota: '额度', week: '周', unknown: '未知', idle: '就绪', thinking: '思考中',
     working: '生成中', tool_use: '工具', initializing: '启动中' },
 };
@@ -63,10 +63,19 @@ export function render(metrics, { language = 'en', width = metrics.width, color 
   };
   const used = metrics.context.usedPercentage;
   const level = used !== null && used >= 90 ? 31 : used !== null && used >= 60 ? 33 : 36;
-  const main = [part(`${l.context} `), part(percentage(used), used === null ? 39 : level, true)];
-  if (used !== null && used >= 90) main.push(part(' !', 31, true));
-  if (width >= 60 && used !== null) main.push(subtle('  '), ...bar(used, level, 8));
-  main.push(subtle('   │   '), part(`${l.cache} `), part(compact(metrics.cacheReadTokens), metrics.cacheReadTokens === null ? 39 : 35, true));
+  const rate = metrics.cacheRate?.percentage ?? null;
+  const mainRow = (bars, reads, short = false) => {
+    const row = [part(`${short ? l.shortContext : l.context} `), part(percentage(used), used === null ? 39 : level, true)];
+    if (used !== null && used >= 90) row.push(part(' !', 31, true));
+    if (bars && used !== null) row.push(subtle('  '), ...bar(used, level, 8));
+    row.push(subtle(short ? ' │ ' : '   │   '), part(`${l.cache} `), part(percentage(rate), rate === null ? 39 : 35, true));
+    if (reads && metrics.cacheRate?.reason !== 'awaiting-stable-usage') row.push(subtle(` · ${compact(metrics.cacheReadTokens)} ${l.read}`));
+    return row;
+  };
+  let main = mainRow(width >= 60, true);
+  if (displayWidth(plain(main)) > width) main = mainRow(false, true);
+  if (displayWidth(plain(main)) > width) main = mainRow(false, false);
+  if (displayWidth(plain(main)) > width) main = mainRow(false, false, true);
   const state = [subtle('   ·   '), part(l[metrics.state] || l.unknown, metrics.state === 'idle' ? 32 : 33)];
   if (displayWidth(plain([...main, ...state])) <= width) main.push(...state);
 

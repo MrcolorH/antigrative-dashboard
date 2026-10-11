@@ -1,13 +1,13 @@
 <div align="center">
 
-<img src="docs/assets/hero-zh.png?v=0.8.0" width="100%" alt="Antigrative Dashboard v0.6.4：最新版速度、缓存和上下文控件，就在输入框旁。">
+<img src="docs/assets/hero-zh.png?v=0.8.0" width="100%" alt="Antigrative Dashboard：最新版速度、缓存和上下文控件，就在输入框旁。">
 
 # Antigrative Dashboard
 
 模型选择旁只显示生成速率、缓存和上下文占用；悬停上下文，一并查看上下文、5 小时和周额度详情。<br>
 缩略信息常驻；鼠标悬停，才展开详细统计。
 
-[![Version 0.8.0](https://img.shields.io/badge/version-0.8.0-91adff?style=flat-square&labelColor=252936)](CHANGELOG.md)
+[![Version 0.8.1](https://img.shields.io/badge/version-0.8.1-91adff?style=flat-square&labelColor=252936)](CHANGELOG.md)
 [![Platforms](https://img.shields.io/badge/host-Windows%20%7C%20Linux%20%7C%20macOS-83d8b9?style=flat-square&labelColor=252936)](COMPATIBILITY.md)
 [![Antigravity 2.21.1 / 2.22.0](https://img.shields.io/badge/Antigravity-2.21.1%20%2F%202.22.0-c5a0ff?style=flat-square&labelColor=252936)](COMPATIBILITY.md)
 [![MIT](https://img.shields.io/badge/license-MIT-d4d9e6?style=flat-square&labelColor=252936)](LICENSE)
@@ -16,7 +16,7 @@
 
 </div>
 
-**v0.8.0 更新：** 新增本地 Token 用量统计：每日/每周活动与天、周、月模型柱状图，加入首次使用提示；修复 [#8](https://github.com/YOU-SHOULD-KNOW-ME/antigrative-dashboard/issues/8) 的异常计时污染 TPS，以及用量窗口和悬浮卡交互问题。桌面 App 与独立 IDE 同步支持。[完整更新说明](https://github.com/YOU-SHOULD-KNOW-ME/antigrative-dashboard/releases/tag/v0.8.0)。
+**v0.8.1 更新：** 修复 [#9](https://github.com/YOU-SHOULD-KNOW-ME/antigrative-dashboard/issues/9) 的 Teamwork／多层子代理挂载与运行态消失问题；修复重新挂载后用量入口失效和语言不同步；新增已核实口径的 CLI 当前请求缓存率。[完整更新说明](https://github.com/YOU-SHOULD-KNOW-ME/antigrative-dashboard/releases/tag/v0.8.1)。
 
 ## 看看效果
 
@@ -53,6 +53,7 @@
 - **用真实数据。** 余额读取账户接口，不根据生成字数推测，不将重置到期自动改成 100%。
 - **切换对话。** 统计跟随当前会话，新对话不沿用上一段对话的速率。
 - **子代理独立统计。** 输入框旁显示当前子代理的 tok/s、缓存率和上下文；详情区分子代理统计和账号共享额度。父子对话切换立即刷新，旧响应不能覆盖新页面或返回同一对话后的新数值。
+- **Teamwork 兼容（v0.8.1）。** 发送、停止、取消状态切换时保留控件，支持深层嵌套和无 `title`／`span` 的静态代理徽章。优先读取当前输入框所属的 DOM 会话标识，URL 不变时也能切换统计；忽略隐藏、禁用及更深层输入框，存在歧义时不随意挂载。中英文六层嵌套浏览器夹具已覆盖用量入口重新挂载和上下文至用量窗口的语言同步。Windows 真实三级委派已检查独立统计、返回主对话与生成中截图；该宿主每层改变 URL、只渲染一个输入框，URL 不变和六层 DOM 场景仍属夹具覆盖。Linux/macOS 登录后界面检查仍待完成。
 - **更新后自动连接。** 适配器保存在用户插件目录，默认安装不修改 App 归档。
 - **对话统计持久化。** 每个账号、每个对话分别保存 tok/s 与 cache，重新加载后可恢复。
 - **适合紧凑窗口。** 完整数值放不下时先保留仪表盘、数据库和上下文圆圈三个图标，仍可悬停或点击查看详情；语言切换保留在上下文卡里。连图标都放不下或确实碰撞宿主按钮时才隐藏，拉宽后恢复。消息按钮滚到输入框后面不会再导致控件消失。
@@ -63,7 +64,7 @@
 ## Antigravity IDE
 
 **v0.7.0** 新增反重力自己的独立 IDE 适配。下载发布页的
-`antigrative-dashboard-ide-0.8.0.vsix`，在 IDE 扩展页选择「从 VSIX 安装」。
+`antigrative-dashboard-ide-0.8.1.vsix`，在 IDE 扩展页选择「从 VSIX 安装」。
 仅安装 IDE 的用户也可以使用，无需先装桌面 App。
 
 完全退出 IDE 后，使用带
@@ -78,7 +79,7 @@ Antigravity 扩展目前尚未兼容。详见 [IDE 安装、更新、诊断和�
 
 ## Antigravity CLI 状态栏
 
-**v0.6.0 新增**独立的 CLI 官方状态栏适配：上下文占用、缓存读取 Token、状态、分组额度及重置倒计时，支持中英文和终端宽度适配。额度数字和进度条按剩余量显示：**≥70% 绿色、≥30% 且 <70% 黄色、<30% 红色**。预览：`node cli/statusline.mjs --preview --language zh-CN`；安装：`python manage.py install-cli`（Linux/macOS 用 `python3`）。需要 Node.js 20+ 和支持官方接口的 CLI。官方输入没有流式耗时，暂不显示 tok/s。详见 [CLI 使用及撤回](docs/CLI.md)。
+**v0.6.0 新增**独立的 CLI 官方状态栏适配：上下文占用、缓存读取 Token、状态、分组额度及重置倒计时，支持中英文和终端宽度适配。额度数字和进度条按剩余量显示：**≥70% 绿色、≥30% 且 <70% 黄色、<30% 红色**。预览：`node cli/statusline.mjs --preview --language zh-CN`；安装：`python manage.py install-cli`（Linux/macOS 用 `python3`）。需要 Node.js 20+ 和支持官方接口的 CLI。v0.8.1 新增当前请求缓存率：适用 CLI 1.3.2/1.3.3 的 Sonnet 4.6、GPT-OSS 120B 及 CLI 1.3.3 的 Gemini 3.8 Flash (High) 已核实口径且写入为零；未确认情况保留不可用。官方输入没有流式耗时，暂不显示 tok/s。详见 [CLI 使用及撤回](docs/CLI.md)。
 
 ![真实 Antigravity CLI 两轮对话及状态栏](docs/assets/cli-conversation-zh.png)
 
@@ -128,7 +129,8 @@ python manage.py install
    - App：先 python manage.py status，再 python manage.py install。
    - CLI：检查 agy --version 和 Node.js 20+，执行 python manage.py install-cli，
      不要执行 manage.py install。已有 statusLine 按 CLI 文档备份／覆盖流程处理。
-     不承诺 CLI 展示 tok/s、缓存命中率或本地用量图表，这些不在 CLI 适配范围内。
+     CLI 缓存率有适用条件，按 docs/CLI.md 核对实测模型／版本及不可用情况。
+     不承诺 CLI 展示 tok/s 或本地用量图表，这些不在 CLI 适配范围内。
    - 独立 IDE：通过 Install from VSIX... 安装发布版 VSIX，或使用
      ide/manage.py install --exe <已核实的IDE可执行文件> --vsix <发布版VSIX>。
      不需要桌面 App，不要执行 App 安装器。
