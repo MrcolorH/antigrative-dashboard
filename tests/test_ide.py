@@ -87,7 +87,7 @@ class IdeTests(unittest.TestCase):
                 vsix.write_bytes(b'fixture')
                 calls = []
                 manager.manage('install', executable, vsix, run=lambda args, **kw: calls.append((args, kw)))
-                self.assertEqual(calls[0][0], [str(executable.resolve()), str(app / 'out/cli.js'), '--install-extension', str(vsix.resolve()), '--force'])
+                self.assertEqual(calls[0][0], [str(executable.resolve()), str((app / 'out/cli.js').resolve()), '--install-extension', str(vsix.resolve()), '--force'])
                 self.assertEqual(calls[0][1]['env']['ELECTRON_RUN_AS_NODE'], '1')
                 self.assertTrue(calls[0][1]['check'])
 
