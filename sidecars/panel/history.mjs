@@ -3,10 +3,11 @@ import { join } from 'node:path';
 import { homedir } from 'node:os';
 import { randomUUID } from 'node:crypto';
 import { safeContext } from './context.mjs';
+import { RATE_VERSION, RATE_REASONS } from './rate-quality.mjs';
 
 const GUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const SCOPE = /^[0-9a-f]{64}$/;
-const numeric = ['steps','rounds','requests','measuredRequests','missingTiming','tps','latestTps','streamingSeconds','modelSeconds','toolSeconds','ttftSeconds'];
+const numeric = ['steps','rounds','requests','measuredRequests','missingTiming','tps','latestTps','streamingSeconds','modelSeconds','toolSeconds','ttftSeconds','excludedTiming','rateWarnings'];
 const counts = ['input','output','responseOutput','thinkingOutput','cacheRead','cacheWrite'];
 const cache = ['inputTokens','cachedTokens','cacheWriteTokens','uncachedTokens','outputTokens','measuredRequests','missingRequests','totalTokens','hitRate'];
 const number = value => typeof value === 'number' && Number.isFinite(value) && value >= 0;
@@ -24,16 +25,30 @@ export function safeMetrics(value, conversationId) {
   result.model = typeof value.model === 'string' ? value.model.slice(0,256) : null;
   result.status = typeof value.status === 'string' && /^[A-Z0-9_]+$/.test(value.status) ? value.status : null;
   result.context = safeContext(value.context) || null;
+  result.rateVersion = value.rateVersion === RATE_VERSION ? RATE_VERSION : 0;
+  result.timingReasons = Object.fromEntries(RATE_REASONS.map(key=>[key,number(value.timingReasons?.[key]) ? value.timingReasons[key] : 0]));
+  result.latestRateStatus = ['ok','missing','unreliable'].includes(value.latestRateStatus) ? value.latestRateStatus : 'missing';
+  if (result.rateVersion !== RATE_VERSION) {
+    // Old aggregates cannot be repaired without the raw trajectory. Retain
+    // usage/context, but never present a legacy unvalidated rate as trustworthy.
+    result.tps = result.latestTps = result.streamingSeconds = null;
+    result.measuredRequests = 0;
+    result.latestRateStatus = 'legacy';
+    result.latestShortSample = false;
+  }
   return result;
 }
 
 export function usableMetrics(metrics) {
-  return number(metrics?.tps) && metrics.measuredRequests > 0 || metrics?.cache?.measuredRequests > 0 || !!safeContext(metrics?.context);
+  return number(metrics?.tps) && metrics.measuredRequests > 0 || metrics?.cache?.measuredRequests > 0 ||
+    metrics?.requests > 0 && metrics?.counts?.output > 0 || !!safeContext(metrics?.context);
 }
 
 export function shouldKeepSaved(saved, fresh) {
+  // A quality reclassification can intentionally reduce measuredRequests.
+  // Protect raw coverage rather than retaining the older polluted TPS.
   return usableMetrics(saved) && (!usableMetrics(fresh) || fresh.complete === false ||
-    fresh.requests < saved.requests || fresh.measuredRequests < saved.measuredRequests ||
+    fresh.requests < saved.requests || fresh.counts?.output < saved.counts?.output ||
     (fresh.cache?.measuredRequests || 0) < (saved.cache?.measuredRequests || 0));
 }
 

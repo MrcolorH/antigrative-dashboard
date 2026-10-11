@@ -25,11 +25,12 @@ module.exports = function installAgPulseInlineWidget() {
   let chosen=localGet('ag-pulse-group'),group=null;
   let refreshRequest=null,manualRequest=null,requestEpoch=0,disposed=false;
   let composer=null,layoutFrame=null;
+  let usageDashboard=null;
   let densityFrame=null,densityMotion=null,densityProbe=null;
   const densityMedia=matchMedia('(prefers-reduced-motion: reduce)');
   const densityEase='cubic-bezier(0.32,0.72,0,1)';
-  let guideReady=false,guideDismissed=false,guideOpened=false,guideSaving=false,guideError=false;
-  function syncGuide(value){if(value?.languageGuideDismissed===true)guideDismissed=true;}
+  let guideReady=false,guideDismissed=false,guideOpened=false,guideSaving=false,guideError=false,usageGuideDismissed=false;
+  function syncGuide(value){if(value?.languageGuideDismissed===true)guideDismissed=true;if(value?.usageGuideDismissed===true){usageGuideDismissed=true;usageDashboard?.syncGuideDismissed();}}
   const preferences=language.connectPreferences({
     read:async()=>{const value=await window.agPulseHost.getPreferences();syncGuide(value);return value;},
     write:async input=>{const value=await window.agPulseHost.setPreferences(input);syncGuide(value);return value;},
@@ -164,6 +165,9 @@ module.exports = function installAgPulseInlineWidget() {
   }
   function fit(){
     if(!node?.isConnected)return;
+    // A modal owns input while open. Composer collision scans behind its
+    // backdrop cannot improve its layout and can hide its hosting strip.
+    if(usageDashboard?.isOpen){stopDensityMotion();return;}
     reserveNativeSpace();
     const bar=root.querySelector('.bar'),oldDensity=node.dataset.density,oldReady=node.dataset.layout==='ready';
     let previous=densityFrame;
@@ -280,7 +284,11 @@ module.exports = function installAgPulseInlineWidget() {
     return r.width>0&&r.height>0&&e.width>0&&e.height>0&&gap<=48&&overlap<=2&&Math.min(r.right,e.right)>Math.max(r.left,e.left)&&p.height<=e.height+r.height+96;
   }
   function closeGroup(){for(const e of root?.querySelectorAll('.group-menu')||[])e.hidden=true;for(const e of root?.querySelectorAll('.group-trigger')||[])e.setAttribute('aria-expanded','false');groupMenu=null;}
-  const cardEngaged=()=>Boolean(root?.activeElement||groupMenu||node?.matches(':hover')||root?.querySelector('.card:not([hidden]):hover'));
+  // Pointer clicks and dialog focus restoration leave buttons focused after
+  // the pointer departs. Only keyboard-visible focus keeps a card engaged.
+  // The explicit first-use action moves focus into language choices. Keep
+  // that guided destination available until the user chooses or leaves it.
+  const cardEngaged=()=>Boolean(root?.activeElement?.matches(':focus-visible')||(guideOpened&&!guideDismissed&&cardName==='context'&&root?.activeElement?.matches('[data-language-choice]'))||groupMenu||node?.matches(':hover')||root?.querySelector('.card:not([hidden]):hover'));
   function cardVisibility(element,visible){
     if(visible){hidden(element,false);if(element.hasAttribute('popover')&&!element.matches(':popover-open'))element.showPopover();}
     else {if(element.hasAttribute('popover')&&element.matches(':popover-open'))element.hidePopover();hidden(element,true);}
@@ -295,7 +303,7 @@ module.exports = function installAgPulseInlineWidget() {
     updateGuide();
   }
   function show(name){
-    if(disposed||!node?.isConnected||changingCards||node.dataset.layout==='blocked')return;
+    if(disposed||!node?.isConnected||changingCards||usageDashboard?.isOpen||node.dataset.layout==='blocked')return;
     if(cardName!==name)closeGroup();
     clearTimeout(hoverTimer);hoverTimer=null;
     clearTimeout(openTimer);openTimer=null;
@@ -426,8 +434,15 @@ module.exports = function installAgPulseInlineWidget() {
     return closest.find(pair=>pair.editor===document.activeElement)||closest.find(pair=>pair.branch===composer?.branch&&pair.editor===composer?.editor)||null;
   }
   function mount(){
+    // Account usage does not belong to a composer lifecycle. Keep its frame
+    // during reflows and park the host if the app replaces the input subtree.
+    // Normal discovery reattaches the strip after the user closes the modal.
+    if(usageDashboard?.isOpen&&node){
+      if(!node.isConnected||!node.getClientRects().length){node.dataset.layout='blocked';document.body.append(node);usageDashboard.restoreModal();}
+      return;
+    }
     const found=findComposer();
-    if(!found){stopDensityMotion();densityFrame=null;densityProbe=null;composer=null;resizeObserver?.disconnect();if(node){hide();themeController?.dispose();themeController=null;node.remove();}return;}
+    if(!found){stopDensityMotion();densityFrame=null;densityProbe=null;composer=null;resizeObserver?.disconnect();if(node){hide();usageDashboard?.dispose();usageDashboard=null;themeController?.dispose();themeController=null;node.remove();}return;}
     found.native=composer?.branch===found.branch?composer.native:captureNative(found);
     if(found.kind==='ide')found.native.reserve=surface.nativeReserve(found);
     composer=found;
@@ -449,6 +464,7 @@ module.exports = function installAgPulseInlineWidget() {
     .density-stage{position:absolute;overflow:clip;pointer-events:none;user-select:none}.density-piece{pointer-events:none!important}
     .scope-note{margin:0 0 10px;color:var(--pulse-muted);font-size:10px}:host([data-scope=main]) .scope-note,:host([data-scope=ide]) .scope-note{display:none}
     .language-button[data-save-failed=true]{color:var(--pulse-warning);text-decoration:underline dotted}.context-ring{display:inline-block;flex:none;width:12px;height:12px;border-radius:50%;background:conic-gradient(var(--pulse-ring) var(--used-angle,0deg),var(--pulse-ring-track) 0);mask:radial-gradient(circle,transparent 43%,#000 47%)}:host(.narrow) .context-label{display:none}
+    #rate-note{white-space:pre-line;font-size:11px;line-height:1.65}
     .bar{gap:6px}.chip{font-size:11px;gap:5px;padding:3px 5px}.context-card>strong{font-size:16px}.context-card>p{margin:8px 0}.quota-heading{margin-top:14px;padding-top:12px;border-top:1px solid var(--pulse-separator)}.quota-title{display:flex;align-items:center;gap:6px;font-size:11px}.quota-title>span:first-child{display:flex;align-items:center;gap:6px;margin-right:auto}.quota-title strong{font-variant-numeric:tabular-nums;font-size:13px}.quota-section+.quota-section{border-top:1px solid var(--pulse-separator);margin-top:12px;padding-top:12px}.quota-section .track{margin:8px 0}.quota-section .footnote{margin-top:6px}.quota-section dl div{margin:6px 0}.context-label{white-space:nowrap}
     :host(.icons-only) .bar{gap:2px}:host(.icons-only) .chip{flex:0 0 24px;width:24px;min-width:24px;height:24px;padding:0;gap:0;justify-content:center}:host(.icons-only) .chip>:not(svg):not(.context-ring){display:none}:host(.icons-only) .bar>.language-button,:host(.icons-only) .bar>.dot{display:none}:host(.icons-only) .chip svg{display:block}.card-language{display:flex;align-items:center;justify-content:space-between;margin-top:10px;padding-top:8px;border-top:1px solid var(--pulse-separator);font-size:10px;color:var(--pulse-muted)}
     .refresh{display:inline-grid;place-items:center}.refresh[aria-busy=true]{color:var(--pulse-emphasis);cursor:wait}.refresh[aria-busy=true] svg{animation:pulse-refresh-spin 1s linear infinite;transform-origin:center}
@@ -511,7 +527,7 @@ module.exports = function installAgPulseInlineWidget() {
     report('mounted',{editorFound:true,composerFound:true});
     observeComposer();
     for(const chip of root.querySelectorAll('[data-card]')){
-      chip.addEventListener('pointerenter',()=>hoverChip(chip.dataset.card));chip.addEventListener('pointerleave',leaveChip);chip.addEventListener('focus',()=>show(chip.dataset.card));chip.addEventListener('click',()=>show(chip.dataset.card));
+      chip.addEventListener('pointerenter',()=>hoverChip(chip.dataset.card));chip.addEventListener('pointerleave',leaveChip);chip.addEventListener('focus',()=>{if(chip.matches(':focus-visible'))show(chip.dataset.card);});chip.addEventListener('click',()=>show(chip.dataset.card));
     }
     for(const card of root.querySelectorAll('.card')){
       card.addEventListener('pointerenter',()=>clearTimeout(hoverTimer));card.addEventListener('pointerleave',scheduleHide);
@@ -527,12 +543,30 @@ module.exports = function installAgPulseInlineWidget() {
     });
     for(const button of root.querySelectorAll('.refresh'))button.addEventListener('click',refreshManually);
     for(const button of root.querySelectorAll('[data-language-choice]'))button.addEventListener('click',()=>{closeGroup();void preferences.choose(button.dataset.languageChoice);});
+    if(window.__agPulseUsageFactory){
+      const section=document.createElement('div');section.id='usage-entry';section.hidden=true;
+      setMarkup(section,'<dl class="usage-summary"><div><dt id="usage-today-label"></dt><dd><strong id="usage-today"></strong><span class="usage-unit">Token</span></dd></div><div><dt id="usage-month-label"></dt><dd><strong id="usage-month"></strong><span class="usage-unit">Token</span></dd></div></dl><button type="button" id="open-usage"><span id="usage-open-label"></span><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M3 8h10M9 4l4 4-4 4"/></svg></button>');$('cache-card').append(section);
+      const css=document.createElement('style');css.textContent='#usage-entry{border-top:1px solid var(--pulse-separator);padding-top:7px;margin-top:12px}#usage-entry[hidden]{display:none}#open-usage{width:100%;display:flex;justify-content:space-between;padding:8px 10px;margin-top:9px;border:1px solid var(--pulse-border);border-radius:7px;background:var(--pulse-control);color:var(--pulse-foreground);font:inherit;transition:background 140ms ease,transform 120ms ease}#open-usage:hover{background:var(--pulse-hover)}#open-usage:active{transform:scale(.98)}';root.append(css);
+      css.textContent+=`
+        #usage-entry{padding-top:13px;margin-top:14px}.usage-summary{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px;padding-bottom:13px;border-bottom:1px solid var(--pulse-separator)}
+        .usage-summary>div{display:block;min-width:0;margin:0}.usage-summary dt{font-size:10px;line-height:16px;color:var(--pulse-muted);margin:0 0 5px}.usage-summary dd{display:flex;align-items:baseline;justify-content:flex-start;gap:5px;margin:0;white-space:nowrap;text-align:left;line-height:24px}
+        .usage-summary strong{font-size:20px;font-weight:550;letter-spacing:-.5px;color:var(--pulse-foreground);font-variant-numeric:tabular-nums}.usage-unit{font-size:9px;letter-spacing:0;color:var(--pulse-muted)}
+        #open-usage{align-items:center;min-height:34px;gap:12px;width:calc(100% + 12px);margin:5px -6px -3px;padding:7px 6px;border:0;border-radius:6px;background:transparent;color:var(--pulse-label);font-size:11px;text-align:left;line-height:20px}#open-usage:hover{background:var(--pulse-hover);color:var(--pulse-foreground)}#open-usage svg{width:14px;height:14px;color:var(--pulse-muted);flex:none}
+      `;
+      usageDashboard=window.__agPulseUsageFactory({root,language,setMarkup,hostLabel:surface?.usageHostLabel||'Antigravity',guideDismissed:usageGuideDismissed,onDismissGuide:async()=>{const saved=await window.agPulseHost.setPreferences({usageGuideDismissed:true});if(saved?.usageGuideDismissed!==true)throw Error('Usage guide could not be saved');syncGuide(saved);},onLanguage:next=>preferences.choose(next),onRefresh:()=>refreshManually()});
+      $('open-usage').addEventListener('click',()=>{const trigger=root.querySelector('[data-card=cache]');hide();usageDashboard.open(data?.usage,trigger);});
+    }
     localize();
     render();refresh();
   }
   function render(){
     if(!root||!data)return;
     syncConversation();
+    if(usageDashboard){
+      const available=Boolean(data.usage);hidden($('usage-entry'),!available);
+      const zh=language.language==='zh-CN';text('usage-today-label',zh?'今日用量':'Today');text('usage-month-label',zh?'本月用量':'This month');
+      text('usage-today',compact(data.usage?.todayTokens));text('usage-month',compact(data.usage?.monthTokens));text('usage-open-label',zh?'查看用量统计':'View token usage');usageDashboard.update(data.usage);
+    }
     if(groupMenu)return;
     const groups=data.groups||[],model=composer?.model?.getAttribute('aria-label')||composer?.model?.textContent||data.speed?.model||'';
     group=groups.find(g=>g.id===chosen)||groups.find(g=>/gemini/i.test(model)?/gemini/i.test(g.id):/claude|gpt/i.test(model)?/3p|claude|gpt/i.test(g.id):false)||groups[0];
@@ -544,7 +578,7 @@ module.exports = function installAgPulseInlineWidget() {
     }
     const speed=data.speed;
     hidden(root.querySelector('[data-card="speed"]'),!lastConversation&&!surface?.showEmpty);
-    hidden(root.querySelector('[data-card="cache"]'),!lastConversation&&!surface?.showEmpty);
+    hidden(root.querySelector('[data-card="cache"]'),!lastConversation&&!surface?.showEmpty&&!data.usage);
     const context=speed?.context, hasCapacity=typeof context?.usedFraction==='number';
     hidden(root.querySelector('[data-card="context"]'),false);
     const empty=surface?.conversationState?.(composer).status==='new'&&!lastConversation&&data.connection==='live';
@@ -560,10 +594,11 @@ module.exports = function installAgPulseInlineWidget() {
     attribute($('context-track'),'aria-valuenow',hasCapacity?Math.min(100,context.usedFraction*100):null);attribute($('context-track'),'aria-valuemin','0');attribute($('context-track'),'aria-valuemax','100');
     text('tps',rate(speed?.tps));text('rounds',speed?t('rounds',{rounds:speed.rounds,steps:speed.steps}):'');
     text('samples',speed?t('sample',{rounds:speed.rounds,steps:speed.steps,requests:speed.measuredRequests}):t('waitingRequest'));text('model-time',seconds(speed?.modelSeconds));text('tool-time',seconds(speed?.toolSeconds));text('ttft',seconds(speed?.ttftSeconds));text('session-rate',`${rate(speed?.tps)} tok/s`);text('latest-rate',`${rate(speed?.latestTps)} tok/s`);text('tokens',speed?`${count(speed.counts.responseOutput)} / ${count(speed.counts.thinkingOutput)} tok`:'—');
-    const basis=t(speed?.rateBasis==='all-output'?'allBasis':'responseBasis');
+    if(speed?.latestRateStatus==='unreliable')text('latest-rate',t('timingUnreliable'));
+    if(speed?.latestRateStatus==='legacy'){text('latest-rate',t('ratePending'));text('session-rate',t('ratePending'));}
     const savedNote=speed?.restoredFromHistory?' '+t('savedStats',{time:speed.savedAt?language.resetDate(speed.savedAt):'—'}):'';
     const saveWarning=data.persistenceError?' '+t('saveFailed'):'';
-    text('rate-note',(language.errorMessage(data.error||data.sessionError)||(!speed?t('waitingRequest'):basis+(speed.missingTiming?' '+t('missingTime',{n:speed.missingTiming}):'')+(/RUNNING/.test(speed.status||'')?' '+t('running'):'')))+savedNote+saveWarning);
+    text('rate-note',[language.errorMessage(data.error||data.sessionError),language.rateNote(speed)].filter(Boolean).join(' ')+savedNote+saveWarning);
     const cache=speed?.cache;
     text('cache-rate',pct(cache?.hitRate));text('cache-detail-rate',pct(cache?.hitRate));
     text('cache-total',cache?.measuredRequests?`${compact(cache.totalTokens)} tok`:'— tok');
@@ -590,7 +625,7 @@ module.exports = function installAgPulseInlineWidget() {
     }
   }
   function refreshManually(){
-    if(manualRequest)return;
+    if(manualRequest)return manualRequest.promise;
     closeGroup();refreshBusy(true);const started=performance.now();
     const epoch=requestEpoch,request={};manualRequest=request;
     request.promise=(async()=>{
@@ -603,6 +638,7 @@ module.exports = function installAgPulseInlineWidget() {
         if(manualRequest===request){refreshBusy(false);manualRequest=null;}
       }
     })();
+    return request.promise;
   }
   function refresh(force=false){
     if(disposed)return;
@@ -628,7 +664,7 @@ module.exports = function installAgPulseInlineWidget() {
   const timerId=setInterval(()=>{mount();fit();tick();position();if(conversationId()!==lastConversation||Date.now()-lastFetch>(document.hidden?10000:2200))refresh();},1000);
   window.__agPulseDispose=()=>{
     disposed=true;requestEpoch++;pending=false;refreshRequest=null;stopDensityMotion();densityFrame=null;densityProbe=null;
-    clearInterval(timerId);clearTimeout(hoverTimer);clearTimeout(openTimer);if(layoutFrame!==null)cancelAnimationFrame(layoutFrame);observer.disconnect();resizeObserver?.disconnect();themeController?.dispose();preferences.dispose();hide();node?.remove();
+    clearInterval(timerId);clearTimeout(hoverTimer);clearTimeout(openTimer);if(layoutFrame!==null)cancelAnimationFrame(layoutFrame);observer.disconnect();resizeObserver?.disconnect();themeController?.dispose();preferences.dispose();hide();usageDashboard?.dispose();node?.remove();
     document.removeEventListener('keydown',onKey);document.removeEventListener('pointerdown',onPointer);
     document.removeEventListener('scroll',scheduleLayout,true);window.removeEventListener('resize',scheduleLayout);
     densityMedia.removeEventListener('change',stopDensityMotion);

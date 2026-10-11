@@ -5,7 +5,7 @@ import { SessionHistory, usableMetrics, shouldKeepSaved } from './history.mjs';
 
 const GUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 export class MetricsStore {
-  constructor(client = new AntigravityClient(), { history = new SessionHistory() } = {}) { this.client = client; this.history = history; }
+  constructor(client = new AntigravityClient(), { history = new SessionHistory(), onTrajectory = null } = {}) { this.client = client; this.history = history; this.onTrajectory=onTrajectory; }
   quota = null;
   quotaAt = 0;
   quotaPending = null;
@@ -76,6 +76,8 @@ export class MetricsStore {
         if (saved) { entry.data = saved.metrics; entry.savedAt = saved.savedAt; }
       }
       const raw = await this.client.trajectory(id);
+      if (!current()) throw new Error('后台已重新连接，请等待刷新');
+      if(this.onTrajectory&&scope){try{await this.onTrajectory(scope,id,raw);if(current())this.usagePersistenceError=false;}catch{if(current())this.usagePersistenceError=true;}}
       if (!current()) throw new Error('后台已重新连接，请等待刷新');
       const fresh = trajectoryMetrics(raw);
       if (shouldKeepSaved(entry.data,fresh)) {

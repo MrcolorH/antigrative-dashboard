@@ -42,6 +42,7 @@ try{
  await host.evaluate(e=>{e.style.flex='0 0 80px';e.style.maxWidth='80px';});
  await page.waitForFunction(()=>document.getElementById('ag-pulse-status-bar')?.dataset.density==='icons');
  assert.equal(await guide.isVisible(),true);await guide.locator('#guide-open').click();
+ await page.waitForTimeout(350);
  assert.equal(await host.locator('#context-card').isVisible(),true);
  assert.equal(await host.locator('#card-language-zh').isVisible(),true);
  await host.locator('#card-language-zh').click();

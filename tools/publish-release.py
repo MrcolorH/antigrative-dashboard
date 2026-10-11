@@ -23,6 +23,8 @@ def checked_assets(root, tag):
             raise ValueError('Packaged version differs')
         for required in ['ide/package.json', 'ide/manage.py', 'ide/package.py', 'ide/README.md']:
             archive.getinfo(prefix + required)
+        for required in ['compat/usage-ui.cjs', 'sidecars/panel/rate-quality.mjs', 'sidecars/panel/usage.mjs']:
+            archive.getinfo(prefix + required)
         for required in ['install.sh', 'uninstall.sh', 'install.ps1', 'compat/runtime-ui.mjs', 'compat/theme.cjs', 'compat/host-theme.mjs', 'compat/preferences.mjs', 'compat/sidecar-owner.mjs', 'sidecars/panel/context.mjs', 'cli/statusline.mjs', 'cli/metrics.mjs', 'cli/render.mjs', 'cli/lifecycle.py', 'docs/CLI.md', 'docs/assets/cli-conversation.png', 'docs/assets/cli-conversation-zh.png']:
             archive.getinfo(prefix + required)
     ide_version = json.loads((root / 'ide/package.json').read_text(encoding='utf-8'))['version']
@@ -40,6 +42,8 @@ def checked_assets(root, tag):
                      'extension/ide/surface.cjs', 'extension/ide/manage.py', 'extension/compat/inline-widget.cjs',
                      'extension/README.md', 'extension/LICENSE']:
             archive.getinfo(name)
+        for name in ['compat/usage-ui.cjs', 'sidecars/panel/rate-quality.mjs', 'sidecars/panel/usage.mjs']:
+            archive.getinfo('extension/' + name)
     return [bundle, checksum, ide, ide_checksum]
 
 

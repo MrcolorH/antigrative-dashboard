@@ -6,6 +6,7 @@ import {RuntimeUi,makeRendererSource} from '../compat/runtime-ui.mjs';
 import {PreferencesStore} from '../compat/preferences.mjs';
 import {MetricsStore} from '../sidecars/panel/store.mjs';
 import {SessionHistory} from '../sidecars/panel/history.mjs';
+import {DesktopUsage as LocalUsage,UsageLedger} from '../sidecars/panel/usage.mjs';
 import {IdeClient} from './client.mjs';
 import {ideTargets} from './runtime.mjs';
 const root=join(dirname(fileURLToPath(import.meta.url)),'..');
@@ -15,12 +16,15 @@ const data=process.env.AG_PULSE_IDE_DATA||join(profile,'User','globalStorage','y
 let debugPort=0;
 const client=new IdeClient({profile,debugPort:()=>debugPort});
 const store=new MetricsStore(client,{history:new SessionHistory(join(data,'history-v1'))});
+const usage=new LocalUsage(store,new UsageLedger(join(data,'usage-v1'),{source:'ide-local'}));
+store.onTrajectory=(scope,id,raw)=>usage.ingest(scope,id,raw);
 const preferences=new PreferencesStore({file:join(data,'preferences.json')});
-const files=await Promise.all(['compat/i18n.cjs','compat/inline-widget.cjs','compat/theme.cjs','ide/surface.cjs'].map(f=>readFile(join(root,f),'utf8')));
+const files=await Promise.all(['compat/i18n.cjs','compat/inline-widget.cjs','compat/theme.cjs','ide/surface.cjs','compat/usage-ui.cjs'].map(f=>readFile(join(root,f),'utf8')));
 const extract=s=>s.slice(s.indexOf('module.exports = ')+17).trim().replace(/;$/,'');
 const ownership=new SidecarOwner(data);
 if(!await ownership.claim())process.exit(0);
-const owner=ownership.token,source=makeRendererSource(...files.slice(0,3),owner,ownership.startedAt);
+const usageSource=`window.__agPulseUsageFactory=(${extract(files[4])});`;
+const owner=ownership.token,source=makeRendererSource(...files.slice(0,3),owner,ownership.startedAt,usageSource);
 const adapter=`window.__agPulseSurface=(${extract(files[3])})();`;
 // Each workbench has its own bridge request ID and DOM conversation ID. Empty
 // composers request account quota only; no most-recent-conversation fallback.
@@ -35,7 +39,8 @@ const snapshot=async input=>{
       value={connection:'live',speed:null,groups:store.quota||[],quotaUpdatedAt:new Date(store.quotaAt).toISOString()};
     }catch{value={connection:'offline',speed:null,groups:[],error:'IDE local API unavailable'};}
   }
-  return {...value,enabled:true,preferences:await preferences.snapshot()};
+  if(input.force)void usage.sync();
+  return {...value,usage:await usage.snapshot(),enabled:true,preferences:await preferences.snapshot()};
 };
 const ui=new RuntimeUi({profile,source:adapter+source,owner,owns:()=>ownership.isOwner(),preferences,snapshot,dataDir:data,targetOrigin:()=> 'vscode-file://vscode-app',
   discover:async()=>{const result=await ideTargets(profile);debugPort=result.port;await client.discover();return result.targets;}});

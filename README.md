@@ -1,13 +1,13 @@
 <div align="center">
 
-<img src="docs/assets/hero.png?v=0.6.3" width="100%" alt="Antigrative Dashboard v0.6.4: current speed, cache and context controls beside the input.">
+<img src="docs/assets/hero.png?v=0.8.0" width="100%" alt="Antigrative Dashboard v0.8.0: current speed, cache and context controls beside the input.">
 
 # Antigrative Dashboard
 
 Token throughput, cache hits and context usage in the model selector row. Hover over context for five-hour and weekly quotas too.<br>
 Keep the summary visible. Hover for the details.
 
-[![Version 0.7.0](https://img.shields.io/badge/version-0.7.0-91adff?style=flat-square&labelColor=252936)](CHANGELOG.md)
+[![Version 0.8.0](https://img.shields.io/badge/version-0.8.0-91adff?style=flat-square&labelColor=252936)](CHANGELOG.md)
 [![Platforms](https://img.shields.io/badge/host-Windows%20%7C%20Linux%20%7C%20macOS-83d8b9?style=flat-square&labelColor=252936)](COMPATIBILITY.md)
 [![Antigravity 2.21.1 / 2.22.0](https://img.shields.io/badge/Antigravity-2.21.1%20%2F%202.22.0-c5a0ff?style=flat-square&labelColor=252936)](COMPATIBILITY.md)
 [![MIT](https://img.shields.io/badge/license-MIT-d4d9e6?style=flat-square&labelColor=252936)](LICENSE)
@@ -16,17 +16,25 @@ Keep the summary visible. Hover for the details.
 
 </div>
 
-**v0.7.0:** Add a dedicated adapter for Google's standalone **Antigravity IDE**: three icons in a narrow Agent pane, numeric summaries when widened, real conversation statistics and stable hover cards. Includes PR #7's hover improvements. Other editor extensions remain unsupported. [Full release notes](https://github.com/YOU-SHOULD-KNOW-ME/antigrative-dashboard/releases/tag/v0.7.0).
+**v0.8.0:** Local Token usage with daily/weekly activity and model charts by day, week and month; first-use guidance; TPS timing-quality checks for [#8](https://github.com/YOU-SHOULD-KNOW-ME/antigrative-dashboard/issues/8); and stable usage-window/hover interactions. Shared by the desktop App and standalone IDE. [Full release notes](https://github.com/YOU-SHOULD-KNOW-ME/antigrative-dashboard/releases/tag/v0.8.0).
 
 ## Preview
 
-<img src="docs/assets/responsive.png?v=0.6.3" width="100%" alt="Current three-icon layout in a narrow main chat and separate statistics beside a subagent input.">
+<img src="docs/assets/responsive.png?v=0.8.0" width="100%" alt="Current three-icon layout in a narrow main chat and separate statistics beside a subagent input.">
 
 <table>
 <tr><th width="50%">Speed and cache</th><th width="50%">Context and shared quotas</th></tr>
 <tr>
-<td width="50%" valign="top"><img src="docs/assets/speed.png?v=0.6.3" width="100%" alt="Current generation speed detail card"><br><img src="docs/assets/widget.png?v=0.6.3" width="100%" alt="Current token usage and cache detail card"></td>
-<td width="50%" valign="top"><img src="docs/assets/context.png?v=0.6.3" width="100%" alt="Current context, five-hour and weekly quota details, with the saved-language control"></td>
+<td width="50%" valign="top"><img src="docs/assets/speed.png?v=0.8.0" width="100%" alt="Current generation speed detail card"><br><img src="docs/assets/widget.png?v=0.8.0" width="100%" alt="Current token usage and cache detail card"></td>
+<td width="50%" valign="top"><img src="docs/assets/context.png?v=0.8.0" width="100%" alt="Current context, five-hour and weekly quota details, with the saved-language control"></td>
+</tr>
+</table>
+
+<table>
+<tr><th width="50%">Daily and weekly activity</th><th width="50%">Usage by model</th></tr>
+<tr>
+<td width="50%"><img src="docs/assets/usage-overview.png?v=0.8.0" width="100%" alt="Current Token usage activity with daily and weekly contribution grids"></td>
+<td width="50%"><img src="docs/assets/usage-details.png?v=0.8.0" width="100%" alt="Current model usage chart with day, week and month controls and theme-adapted colors"></td>
 </tr>
 </table>
 
@@ -59,7 +67,7 @@ Keep the summary visible. Hover for the details.
 ## Antigravity IDE
 
 **v0.7.0** adds a separate VSIX for Google's own standalone IDE. Download
-`antigrative-dashboard-ide-0.7.0.vsix` from the release and choose **Install from VSIX…**
+`antigrative-dashboard-ide-0.8.0.vsix` from the release and choose **Install from VSIX…**
 in the IDE's Extensions view. No desktop App installation is required.
 
 Fully quit the IDE, then start it with
@@ -154,7 +162,7 @@ The stable internal plugin ID remains `antigravity-pulse` for compatibility with
 | Cache hit | Cached-read tokens divided by uncached input + cache reads + cache writes; token-weighted across requests |
 | Token total | Normalized total input plus output tokens, including thinking output |
 | Session TPS | Sum of response tokens from valid requests divided by their total streaming duration |
-| Last-request TPS | Response tokens divided by streaming duration for the latest valid request |
+| Last-request TPS | Response tokens divided by streaming duration for the latest request; uncertain or missing timing stays unavailable |
 | TTFT | Average time to first token; excluded from response streaming TPS |
 | Model time | TTFT plus streaming duration across requests |
 | Tool time | Union of tool execution intervals; overlapping time counted once |
@@ -165,11 +173,32 @@ Request metrics update after requests finish, with a poll about every 2.2 second
 Antigravity normalizes `inputTokens` to uncached input even for Gemini; these are not upstream prompt-token counters. Cache writes are not hits. Cache details show unavailable or partial coverage when the provider counters are unsupported.
 Thinking tokens are separate. If a model does not expose response tokens, the detail card explains the all-output fallback. Requests without valid timing do not contribute to TPS. Missing or disconnected data is labeled accordingly.
 
+### Timing quality
+
+Very high TPS can occur when output arrives in a batch and the recorded stream lasts only milliseconds. A short receipt window may not represent actual model generation time. The plugin checks timing quality before adding a request to session TPS; it never caps speed or invents a longer duration.
+
+- **Excluded from TPS:** invalid token scopes, conflicting duplicate request records, multiple differing attempt usages without matching timing, and nonfinite rates. A tool-only stream is also treated as uncertain when it lasts under 1 second, follows at least 2 seconds of TTFT, and TTFT is at least 20 times its stream duration.
+- **Same-model check:** with at least five otherwise eligible samples lasting 1 second or more, a short sample above `max(8 × median, median + 12 × MAD)` is excluded. The baseline uses the same model, provider and token basis; MAD is the median absolute deviation.
+- **Retained samples:** ordinary short text and sustained high speeds remain eligible. A high number alone is not enough to reject a sustained sample. Uncertain requests still contribute their reported token and cache usage; excluding their rate does not delete the request.
+- **Display and saved data:** an uncertain latest request shows **Timing uncertain**, without substituting the preceding request's speed. If no samples qualify, TPS is unavailable. Old saved rates await recalculation from the complete local trajectory; token/cache/context data is retained. Reloading does not restore the old unvalidated TPS.
+
+These are conservative checks on host timing summaries, not proof of buffering. The current local API does not expose a chunk timeline, so missing server generation time cannot be reconstructed. The interface keeps the calculation basis concise; filtering rules are documented here. Desktop and standalone IDE share these rules. See [timing policy and limitations](docs/TPS.md), informed by DSH discussions [#7960](https://github.com/deepseek-ai/deepseek-harness/discussions/7960) and [#6129](https://github.com/deepseek-ai/deepseek-harness/discussions/6129).
+
 ## Saved conversation statistics
 
 Completed-request TPS, cache counts and whitelisted context estimates are saved automatically in `~/.gemini/antigravity/sidecar_data/antigravity-pulse/panel/data/history-v1/<account-hash>/<conversation-id>.json`. Reloading, restarting, updating or reinstalling the plugin preserves them. Empty or regressing backend data cannot erase a useful saved sample. Saved fallbacks show their saved time in the details. A real 0% cache hit remains 0%.
 
 Records contain whitelisted statistics and model/status only; no prompts, titles, emails or credentials. The current account must be authenticated before its saved files are loaded. Already missing timing cannot be reconstructed. To backfill all conversations still available from the local API and check restart restoration, run `node tools/check-live-history.mjs` with Antigravity open.
+
+## Local Token usage
+
+Open the cache/database icon, then **View token usage**. Today and this month share a compact two-column entry. Activity shows daily/weekly contribution grids; Usage details shows model stacks by day, week or month. Chart colors follow your actual theme and accent; K/M/B summaries use at most one decimal, while tables/tooltips retain full counts.
+
+The first-use introduction explains history import, coverage and privacy. **Got it** saves completion across restarts, language changes and theme changes. Closing the window without acknowledgment keeps the tip for next time; a failed save can be retried.
+
+Available local conversations are imported on startup and checked every 60 seconds. New completed requests are recorded during normal polling. The local `usage-v1` ledger deduplicates requests per account and keeps only time, model, Token counters and hashed identifiers; no prompts, replies or credentials. Desktop and IDE have separate ledgers. Deleting a chat does not subtract usage already recorded. This is observed local usage, not a provider bill; missing/deleted historical data may leave gaps. Days/months use UTC+8 and weeks start Monday.
+
+Desktop: `~/.gemini/antigravity/sidecar_data/antigravity-pulse/panel/data/usage-v1/` (the host may override the data directory). IDE: `User/globalStorage/you-should-know-me.antigrative-dashboard-ide/usage-v1/` under its profile. Stop the plugin before deleting its ledger; available conversations will be imported again when it restarts. `history-v1` remains the separate latest-per-conversation statistics store. [Accounting, cleanup and limitations](docs/USAGE.md).
 
 ## Compatibility
 

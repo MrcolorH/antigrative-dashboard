@@ -4,6 +4,7 @@ import {createServer} from 'node:http';
 import {dirname,join} from 'node:path';
 import {fileURLToPath,pathToFileURL} from 'node:url';
 import assert from 'node:assert/strict';
+import {trajectoryMetrics} from '../sidecars/panel/metrics.mjs';
 const repo=join(dirname(fileURLToPath(import.meta.url)),'..');
 const sources=await Promise.all(['compat/i18n.cjs','compat/theme.cjs','compat/inline-widget.cjs','ide/surface.cjs'].map(f=>readFile(join(repo,f),'utf8')));
 const extract=s=>s.slice(s.indexOf('module.exports = ')+17).trim().replace(/;$/,'');
@@ -13,7 +14,7 @@ body{margin:0;background:#202124;color:#eee;font:12px Arial}.panel{width:100%;bo
 </style></head><body><div class="antigravity-agent-side-panel panel"><div class="top"></div><div id="conversation" role="region"><div id="antigravity.agentSidePanelInputBox" class="box"><div class="editor" contenteditable="true" role="combobox" aria-label="Message input"></div><div class="row"><div class="native"><button class="protected">＋</button><input hidden><div class="model-wrap"><button class="model" data-testid="model-selector-trigger"><span>Gemini 3.8 Flash High</span><svg viewBox="0 0 16 16"><path d="M4 6l4 4 4-4"/></svg></button></div></div><div class="controls"><button class="protected">♩</button><button class="protected">➤</button></div></div></div></div></div><script>
 const box=document.getElementById('antigravity.agentSidePanelInputBox'),panel=document.querySelector('.panel');
 const owner={props:{cascadeId:${JSON.stringify(id)}},__k:[]},vnode={type:'div',__e:box,props:{id:box.id},__:owner,__k:[]};owner.__k=[vnode];panel.__k=owner;
-window.testOwner=owner;window.metricsRequests=[];window.testTps=166.6;window.testPreferences={language:'en',languageGuideDismissed:true,revision:1};
+window.testOwner=owner;window.metricsRequests=[];window.testTps=166.6;window.testQuality=null;window.testPreferences={language:'en',languageGuideDismissed:true,revision:1};
 const windows={'5h':{remaining:.8,available:true,resetAt:new Date(Date.now()+3600000).toISOString()},weekly:{remaining:.6,available:true,resetAt:new Date(Date.now()+86400000).toISOString()}};
 window.agPulseHost={getPreferences:async()=>testPreferences,setPreferences:async input=>(testPreferences={...testPreferences,...input,revision:testPreferences.revision+1}),getMetrics:async input=>{metricsRequests.push(input.conversationId);return {connection:'live',preferences:testPreferences,groups:[{id:'gemini',name:'Gemini',windows},{id:'3p',name:'Claude / GPT',windows}],quotaUpdatedAt:'2026-10-10T00:00:00Z',speed:input.conversationId?{conversationId:input.conversationId,tps:testTps,rounds:2,steps:7,counts:{responseOutput:6000,thinkingOutput:2000},cache:{hitRate:.45,totalTokens:53000,measuredRequests:2},context:{usedFraction:.14,remainingFraction:.86,usedTokens:140000,maxTokens:1000000,model:'Gemini'}}:null};}};
 window.__agPulseSurface=(${extract(sources[3])})();window.__agPulseI18nFactory=(${extract(sources[0])});window.__agPulseThemeFactory=(${extract(sources[1])});(${extract(sources[2])})();
@@ -50,8 +51,22 @@ try{
  assert.ok(stable.scroll>0,'Fixture must actually clip and scroll the card');assert.ok(stable.polls>=2);assert.equal(stable.maxScrollDelta,0);assert.deepEqual(stable.finalRect,stable.rect);assert.deepEqual(stable.changes,[]);assert.equal(stable.open,true);
  await page.locator('.group-trigger').click();await page.waitForTimeout(3300);assert.ok(await page.locator('.group-menu').isVisible());await page.locator('[data-group="3p"]').click();
  await page.evaluate(()=>{testTps=200;});await page.waitForFunction(()=>document.getElementById('ag-pulse-status-bar').shadowRoot.getElementById('tps').textContent==='200.0');
+ await page.evaluate(()=>{const original=agPulseHost.getMetrics;agPulseHost.getMetrics=async input=>{const data=await original(input);return {...data,speed:data.speed&&testQuality?{...data.speed,...testQuality,conversationId:data.speed.conversationId}:data.speed};};});
+ const quality=trajectoryMetrics({trajectory:{generatorMetadata:[{stepIndices:[0],chatModel:{usage:{outputTokens:17776,responseOutputTokens:17776},streamingDuration:.349271,timeToFirstToken:106}}],steps:[{type:'CORTEX_STEP_TYPE_PLANNER_RESPONSE',plannerResponse:{toolCalls:[{}]}}]}});
+ await page.evaluate(quality=>{testQuality=quality;},quality);
+ await page.waitForFunction(()=>document.getElementById('ag-pulse-status-bar').shadowRoot.getElementById('latest-rate').textContent==='Timing uncertain');
+ await page.keyboard.press('Escape');await page.locator('[data-card=speed]').click();
+ assert.equal(await page.locator('#rate-note').textContent(),'Calculation: response tokens ÷ streaming time; session TPS is time-weighted.');
+ assert.equal(await page.locator('#tps').textContent(),'—');
+ await page.screenshot({path:join(repo,'.data/ide/tps-quality-en.png')});
+ await page.evaluate(()=>{testQuality=null;});
+ await page.waitForFunction(()=>document.getElementById('ag-pulse-status-bar').shadowRoot.getElementById('tps').textContent==='200.0');
  await page.keyboard.press('Escape');
  await page.locator('[data-card=context]').click();await page.locator('#card-language-zh').click();await page.waitForTimeout(150);assert.equal((await state()).lang,'zh-CN');await page.keyboard.press('Escape');
+ await page.evaluate(quality=>{testQuality=quality;},quality);
+ await page.waitForFunction(()=>document.getElementById('ag-pulse-status-bar').shadowRoot.getElementById('latest-rate').textContent==='计时异常');
+ await page.locator('[data-card=speed]').click();assert.equal(await page.locator('#rate-note').textContent(),'统计方式：正文 Token ÷ 流式时长；会话 TPS 按总时长加权。');
+ await page.screenshot({path:join(repo,'.data/ide/tps-quality-zh.png')});await page.keyboard.press('Escape');await page.evaluate(()=>{testQuality=null;});
  // A different child/subagent/history ID must never win over the input owner.
  await page.evaluate(other=>{const decoy={props:{cascadeId:other},__k:[]};testOwner.__k.unshift(decoy);},other);
  assert.equal((await state()).id,id);

@@ -1,10 +1,17 @@
 // Pure transforms. No credentials, prompts, or message text enter the public result.
 import { contextMetrics } from './context.mjs';
+import { classifyRates, RATE_VERSION, RATE_REASONS } from './rate-quality.mjs';
 export function seconds(value) {
   if (typeof value === 'number') return Number.isFinite(value) && value >= 0 ? value : null;
-  if (typeof value === 'string' && /^\d+(?:\.\d+)?s$/.test(value)) return Number(value.slice(0, -1));
+  if (typeof value === 'string' && /^\d+(?:\.\d+)?s$/.test(value)) {
+    const n = Number(value.slice(0, -1));
+    return Number.isFinite(n) ? n : null;
+  }
   if (value && typeof value === 'object') {
-    const n = Number(value.seconds || 0) + Number(value.nanos || 0) / 1e9;
+    if (value.seconds === undefined && value.nanos === undefined) return null;
+    const whole = Number(value.seconds ?? 0), nanos = Number(value.nanos ?? 0);
+    if (!Number.isSafeInteger(whole) || whole < 0 || !Number.isInteger(nanos) || nanos < 0 || nanos >= 1e9) return null;
+    const n = whole + nanos / 1e9;
     return Number.isFinite(n) && n >= 0 ? n : null;
   }
   return null;
@@ -48,7 +55,8 @@ function unionSeconds(intervals) {
 export function trajectoryMetrics(response) {
   const trajectory = response.trajectory || {};
   const generators = trajectory.generatorMetadata || [];
-  const samples = [], ids = new Set();
+  const samples = [], ids = new Map();
+  const steps = trajectory.steps || [];
   const counts = { input: 0, output: 0, responseOutput: 0, thinkingOutput: 0, cacheRead: 0, cacheWrite: 0 };
   let modelSeconds = 0, ttftSeconds = 0, ttftSamples = 0, missingTiming = 0;
   const cache = { inputTokens:0, cachedTokens:0, cacheWriteTokens:0, uncachedTokens:0, outputTokens:0, measuredRequests:0, missingRequests:0 };
@@ -61,8 +69,13 @@ export function trajectoryMetrics(response) {
     // Never collapse those follow-ups, even when no request ID was returned.
     const id = usage.responseId ? `response:${usage.apiProvider||''}:${usage.responseId}`
       : usage.messageId ? `message:${usage.messageId}` : `index:${index}`;
-    if (ids.has(id)) continue;
-    ids.add(id);
+    const signature = JSON.stringify([usage.outputTokens,usage.responseOutputTokens,usage.thinkingOutputTokens,
+      seconds(chat.streamingDuration),seconds(chat.timeToFirstToken),chat.responseModel,chat.model,usage.model]);
+    if (ids.has(id)) {
+      const previous = ids.get(id);
+      if (previous.signature !== signature && !previous.sample.reasons.includes('duplicate-scope')) previous.sample.reasons.push('duplicate-scope');
+      continue;
+    }
     const cached = requestCacheMetrics(usage);
     if(cached) {
       for(const key of ['inputTokens','cachedTokens','cacheWriteTokens','uncachedTokens'])cache[key]+=cached[key];
@@ -85,15 +98,36 @@ export function trajectoryMetrics(response) {
     counts.cacheWrite += tokenCount(usage.cacheWriteTokens) ?? 0;
     if (ttft !== null) { ttftSeconds += ttft; ttftSamples++; }
     modelSeconds += (ttft ?? 0) + (duration ?? 0);
-    if (responseTokens !== null && duration > 0) {
-      samples.push({ id, responseTokens, duration, tps: responseTokens / duration,
-        model: chat.modelDisplayName || chat.responseModel || String(chat.model || usage.model || ''),
-        basis: visible !== null || thinking !== null ? 'response' : 'all-output', shortSample: duration < 1 });
-    } else if (responseTokens > 0) missingTiming++;
+    const reasons = [];
+    if (['outputTokens','responseOutputTokens','thinkingOutputTokens'].some(key=>usage[key] !== undefined && tokenCount(usage[key]) === null) ||
+        output !== null && (visible !== null && visible > output || thinking !== null && thinking > output ||
+          visible !== null && thinking !== null && visible + thinking > output)) reasons.push('token-scope');
+    // One retryInfos entry is the ordinary attempt record, not evidence of a retry.
+    // Multiple differing usage records lack attempt-specific timing in this API.
+    const attempts = (Array.isArray(chat.retryInfos) ? chat.retryInfos : []).filter(info=>info?.usage);
+    if (attempts.length > 1 && attempts.some(info=>['outputTokens','responseOutputTokens','thinkingOutputTokens'].some(key=>
+        tokenCount(info.usage[key]) !== tokenCount(usage[key])))) reasons.push('retry-scope');
+    const planners = (generator.stepIndices || []).map(i=>Number.isInteger(i) && i >= 0 ? steps[i] : null)
+      .filter(step=>/PLANNER_RESPONSE/.test(String(step?.type || '')));
+    const toolOnly = planners.length > 0 && planners.every(step=>step.plannerResponse?.toolCalls?.length > 0 &&
+      !String(step.plannerResponse?.response || '').trim());
+    const basis = visible !== null || thinking !== null ? 'response' : 'all-output';
+    const sample = { responseTokens, duration, ttft, reasons, toolOnly,
+      tps: responseTokens !== null && duration > 0 ? responseTokens / duration : null,
+      model: chat.modelDisplayName || chat.responseModel || String(chat.model || usage.model || ''), basis,
+      profile: JSON.stringify([usage.apiProvider || '',chat.responseModel || usage.model || chat.model || chat.modelDisplayName || '',basis]) };
+    samples.push(sample);
+    ids.set(id,{signature,sample});
   }
-  const streamingSeconds = samples.reduce((sum, s) => sum + s.duration, 0);
-  const sampledTokens = samples.reduce((sum, s) => sum + s.responseTokens, 0);
-  const steps = trajectory.steps || [];
+  classifyRates(samples);
+  const accepted = samples.filter(sample=>sample.status === 'ok');
+  missingTiming = samples.filter(sample=>sample.status === 'missing' && sample.responseTokens > 0).length;
+  const excludedTiming = samples.filter(sample=>sample.status === 'unreliable').length;
+  const rateWarnings = samples.filter(sample=>sample.status === 'ok' && (sample.duration < 1 || sample.outlier)).length;
+  const timingReasons = Object.fromEntries(RATE_REASONS.map(reason=>[reason,samples.filter(sample=>sample.reasons.includes(reason)).length]));
+  const streamingSeconds = accepted.reduce((sum, s) => sum + s.duration, 0);
+  const sampledTokens = accepted.reduce((sum, s) => sum + s.responseTokens, 0);
+  const basisSamples = accepted.length ? accepted : samples;
   const tools = steps.filter(s => /SEARCH_WEB|BROWSE|RUN_COMMAND|COMMAND|READ|WRITE|EDIT|CODE_ACTION|TOOL|MCP|LIST|GREP|VIEW|FIND|TERMINAL/i.test(String(s.type || '')) || s.metadata?.toolCall);
   const toolSeconds = unionSeconds(tools.map(s => [Date.parse(s.metadata.startedAt || s.metadata.createdAt), Date.parse(s.metadata.completedAt)]));
   const latest = samples.at(-1) || null;
@@ -102,12 +136,13 @@ export function trajectoryMetrics(response) {
     source: 'Antigravity request metadata', status: response.status || null,
     conversationId: trajectory.cascadeId || null,
     steps: Number(response.numTotalSteps ?? steps.length), rounds: steps.filter(s => /USER_INPUT/.test(String(s.type))).length,
-    requests: ids.size, measuredRequests: samples.length, missingTiming, counts,
+    requests: ids.size, measuredRequests: accepted.length, missingTiming, excludedTiming, rateWarnings, timingReasons, rateVersion: RATE_VERSION, counts,
     cache:{...cache,totalTokens:cache.inputTokens+cache.outputTokens,hitRate:cache.inputTokens>0?cache.cachedTokens/cache.inputTokens:null,complete:cache.missingRequests===0},
-    tps: streamingSeconds > 0 ? sampledTokens / streamingSeconds : null, latestTps: latest?.tps ?? null,
-    rateBasis: samples.length && samples.every(s => s.basis === 'response') ? 'response' : 'all-output',
+    tps: streamingSeconds > 0 ? sampledTokens / streamingSeconds : null, latestTps: latest?.status === 'ok' ? latest.tps : null,
+    latestRateStatus: latest?.status ?? 'missing',
+    rateBasis: basisSamples.length && basisSamples.every(s => s.basis === 'response') ? 'response' : 'all-output',
     streamingSeconds, modelSeconds, toolSeconds, ttftSeconds: ttftSamples ? ttftSeconds / ttftSamples : null,
-    latestShortSample: latest?.shortSample ?? false, model: latest?.model || null,
+    latestShortSample: latest?.status === 'ok' && latest.duration < 1, model: latest?.model || null,
     context: contextMetrics(lastChat?.chatStartMetadata?.contextWindowMetadata, {
       model:lastChat?.modelDisplayName || lastChat?.responseModel || String(lastChat?.model || ''),
       sampledAt:lastChat?.chatStartMetadata?.createdAt,

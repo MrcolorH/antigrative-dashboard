@@ -119,18 +119,18 @@ function rendererBridge(binding) {
   };
 }
 
-export function makeRendererSource(i18n, widget, theme = '', owner = null, generation = 0) {
+export function makeRendererSource(i18n, widget, theme = '', owner = null, generation = 0, extraSource = '') {
   const extract = source => {
     const prefix = 'module.exports = ', index = source.indexOf(prefix);
     if (index < 0) throw new Error('Widget source format changed');
     return source.slice(index + prefix.length).trim().replace(/;$/, '');
   };
-  const version = createHash('sha256').update(i18n + widget + theme + rendererBridge.toString()+JSON.stringify(owner)).digest('hex');
+  const version = createHash('sha256').update(i18n + widget + theme + extraSource + rendererBridge.toString()+JSON.stringify(owner)).digest('hex');
   const upgrade = 'if(window.__agPulseRuntimeVersion!==' + JSON.stringify(version) + '){window.__agPulseDispose?.();window.__agPulseRuntimeBridge?.dispose();delete window.agPulseHost;window.__agPulseRuntimeVersion=' + JSON.stringify(version) + ';}';
   const binding=owner?BINDING+'_'+owner.replaceAll('-',''):BINDING;
   const rank=JSON.stringify([generation,owner||'']);
   const code=upgrade + 'window.__agPulseRuntimeOwner='+JSON.stringify(owner)+';window.__agPulseRuntimeRank='+rank+';' + '(' + rendererBridge.toString() + ')('+JSON.stringify(binding)+');window.__agPulseI18nFactory=(' + extract(i18n) + ');'
-    + (theme ? 'window.__agPulseThemeFactory=(' + extract(theme) + ');' : '') + '(' + extract(widget) + ')();';
+    + (theme ? 'window.__agPulseThemeFactory=(' + extract(theme) + ');' : '') + extraSource + '(' + extract(widget) + ')();';
   // A delayed injection from a superseded instance cannot replace a newer UI.
   return owner?'if(!window.__agPulseRuntimeRank||window.__agPulseRuntimeRank[0]<'+generation+'||(window.__agPulseRuntimeRank[0]==='+generation+'&&window.__agPulseRuntimeRank[1]<='+JSON.stringify(owner)+')){'+code+'}':code;
 }
@@ -169,7 +169,7 @@ export class RuntimeUi {
       if (input.type === 'metrics') result = await this.enabled() ? await this.snapshot(validatedInput(input.input)) : { ...offline('Antigrative Dashboard 已停用'), enabled: false };
       else if (input.type === 'preferences' && this.preferences) {
         const value=input.input;
-        if(!value||typeof value!=='object'||Array.isArray(value)||Object.keys(value).some(key=>!['language','languageGuideDismissed'].includes(key)))throw new Error('Invalid preferences request');
+        if(!value||typeof value!=='object'||Array.isArray(value)||Object.keys(value).some(key=>!['language','languageGuideDismissed','usageGuideDismissed'].includes(key)))throw new Error('Invalid preferences request');
         result=Object.keys(value).length?await this.preferences.set(value):await this.preferences.get();
       }
       else if (input.type === 'diagnostic' && ['boot', 'mounted', 'mount-error'].includes(input.input?.stage)) {

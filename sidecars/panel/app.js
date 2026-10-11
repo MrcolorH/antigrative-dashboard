@@ -87,7 +87,7 @@ function render() {
   renderQuota('5h','five'); renderQuota('weekly','week');
   $('strip-tps').textContent = rate(speed?.tps);
   $('session-tps').textContent = rate(speed?.tps);
-  $('latest-tps').textContent = rate(speed?.latestTps);
+  $('latest-tps').textContent = speed?.latestRateStatus==='unreliable'?t('timingUnreliable'):speed?.latestRateStatus==='legacy'?t('ratePending'):rate(speed?.latestTps);
   $('request-count').textContent = t('sampleCount',{n:speed?.measuredRequests??0});
   $('session-steps').textContent = speed ? t('rounds',{rounds:speed.rounds,steps:speed.steps}) : '';
   $('strip-model').textContent = speed?.model || t('waitingRequest');
@@ -95,10 +95,9 @@ function render() {
   $('tool-time').textContent = language.elapsed(speed?.toolSeconds);
   $('ttft').textContent = language.elapsed(speed?.ttftSeconds);
   $('token-detail').textContent = speed ? `${count(speed.counts.responseOutput)} / ${count(speed.counts.thinkingOutput)} tok` : '—';
-  const basis=t(speed?.rateBasis==='all-output'?'allBasis':'responseBasis');
   const savedNote=speed?.restoredFromHistory?' '+t('savedStats',{time:speed.savedAt?language.resetDate(speed.savedAt):'—'}):'';
   const saveWarning=snapshot.persistenceError?' '+t('saveFailed'):'';
-  $('speed-basis').textContent = basis+(speed?.missingTiming?' '+t('missingTime',{n:speed.missingTiming}):'')+(speed?.latestShortSample?' '+t('shortSample'):'')+savedNote+saveWarning;
+  $('speed-basis').textContent = language.rateNote(speed)+savedNote+saveWarning;
   const cache=speed?.cache;
   const context=speed?.context,hasCapacity=typeof context?.usedFraction==='number';
   $('strip-context').textContent=hasCapacity?`${Math.round(context.usedFraction*100)}%`:'—';

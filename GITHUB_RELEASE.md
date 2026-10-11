@@ -1,65 +1,43 @@
-# Antigrative Dashboard v0.7.0
+# Antigrative Dashboard v0.8.0
 
-## Standalone Antigravity IDE adapter
+## Local Token usage for the App and standalone IDE
 
-- Add a dedicated VSIX for Google's own Antigravity IDE. Its narrow Agent input
-  shows three interactive icons; widening the pane reveals numeric summaries.
-  Native controls keep their space and the dashboard hides only when the icons
-  cannot fit safely.
-- Read speed, cache, context and account quotas from the IDE's main language
-  server. Bind each input to its actual conversation, reject stale/other-profile
-  sources, and restore saved statistics without guessing the most recent chat.
-- Count tool follow-up requests separately even when they share an execution ID.
-  Prefer response/message IDs for deduplication, preserving real cache reads.
-- Render fixed templates with DOM operations under the IDE's existing Trusted
-  Types policy. Preserve hover-card scroll, focus and menus across unchanged polls.
-- Retain theme adaptation, saved English/Chinese choices and first-use guidance.
-  Updates preserve the extension identity and user global-storage directory.
-- Include a host-checked Python install/launch/uninstall helper using the IDE's
-  bundled runtime, a complete allowlisted VSIX and SHA256 checksums. Fresh health
-  reporting prevents old state files from appearing connected.
+- Open the database/cache card and choose **View token usage**. Daily/weekly contribution grids and model charts by day, week and month show local recorded consumption, with model filtering and exact-count tables.
+- Colors follow the host theme, accent and background. Custom year menus, stable window geometry, aligned controls and K/M/B formatting keep the interface consistent.
+- The cache card includes a compact two-column **Today / This month** summary.
+- First-use guidance explains local history import, incomplete coverage, UTC+8 date boundaries, storage and deletion. Acknowledgment survives restarts and language/theme changes; failed saves offer retry.
+- Records are isolated by account. Available local history is imported and repeated requests are deduplicated. Deleting a conversation does not subtract previously recorded usage. Only numeric metadata and hashed identities are retained; prompts, replies and credentials are not stored.
+- This is local observed usage, not an account bill. The desktop App and IDE use separate ledgers; missing/deleted history cannot be reconstructed.
 
-**Scope:** Windows 11 / Antigravity IDE 2.5.5 has passed real local use. Linux/macOS
-have automated process/installer/package/browser coverage; signed-in IDE GUI
-acceptance is still outstanding. VS Code, Visual Studio, JetBrains, Zed and Xcode
-extensions are not supported by this adapter. Default IDE profiles only.
+## TPS timing quality - Issue #8
 
-## Hover improvements from PR #7
+- Match output counters to request timing, reject conflicting duplicate/retry summaries, and quarantine conservative short tool-only and same-model statistical outliers.
+- Preserve ordinary short responses and sustained high speeds. There is no fixed speed cap, fabricated duration or TTFT added to the streaming denominator.
+- Show uncertain latest timing as unavailable instead of reusing an earlier speed. Token usage, cache and context remain available independently.
+- Recalculate legacy saved rates when complete trajectories become readable. The host API does not expose chunk timing, so exact server generation time and buffering cannot be reconstructed.
 
-Thanks to @qwqZYLqwq for the hover interaction contribution.
-First hover waits 250ms; moving between cards is immediate while warm. Leaving
-has a 120ms grace period and a 350ms warm window. Click and keyboard focus remain
-immediate. Delayed tasks are cancelled on navigation, unmount and disposal;
-16 production-widget browser cases cover the behavior, including macOS timing.
+See [TPS policy](https://github.com/YOU-SHOULD-KNOW-ME/antigrative-dashboard/blob/v0.8.0/docs/TPS.md) and [usage accounting and cleanup](https://github.com/YOU-SHOULD-KNOW-ME/antigrative-dashboard/blob/v0.8.0/docs/USAGE.md).
 
-## Downloads and installation
+## Interaction fixes
 
-- **Desktop App / CLI:** `antigrative-dashboard-0.7.0.zip` and `.zip.sha256`.
-  Extract and run `python manage.py install` for the App, or
-  `python manage.py install-cli` for the CLI. Use `python3` on Linux/macOS.
-- **Antigravity IDE:** `antigrative-dashboard-ide-0.7.0.vsix` and `.vsix.sha256`.
-  Choose **Install from VSIX…** in the IDE's Extensions view. Then fully quit and
-  start the IDE with `--remote-debugging-port=0 --remote-debugging-address=127.0.0.1`.
-  Append these flags to your IDE shortcut for subsequent launches.
+- Keep the usage window open across polling, temporary missing snapshots and composer replacement; account switches clear stale displayed data.
+- Queue manual refresh behind polling and complete its visible rotation.
+- Restore pointer and keyboard focus correctly when closing usage. Hover cards auto-dismiss after the pointer leaves.
+- Update English/Chinese README previews using the latest production widget and clearly labeled illustrative data.
 
-The IDE does not require the desktop App. Ordinary launches without the flags
-cannot attach the inline dashboard. The debugging endpoint stays on loopback;
-application binaries and CSP settings remain untouched.
-See [IDE installation and data cleanup](https://github.com/YOU-SHOULD-KNOW-ME/antigrative-dashboard/blob/v0.7.0/ide/README.md).
+## Downloads
 
-Publication requires Windows/Linux/macOS data, lifecycle, desktop/IDE Chromium
-regressions and official desktop resource checks. Automated fixtures do not
-replace signed-in Linux/macOS GUI acceptance. The existing desktop screenshots
-illustrate the desktop widget; they are not IDE screenshots.
+- **Desktop App / CLI:** `antigrative-dashboard-0.8.0.zip` and `.zip.sha256`. Extract and run `python manage.py install` for the App or `python manage.py install-cli` for the CLI. Use `python3` on Linux/macOS. The CLI feature set is unchanged.
+- **Standalone Antigravity IDE:** `antigrative-dashboard-ide-0.8.0.vsix` and `.vsix.sha256`. Choose **Install from VSIX...** in Extensions. Fully quit, then start with `--remote-debugging-port=0 --remote-debugging-address=127.0.0.1`; retain these flags on subsequent launches.
+
+Updates retain the plugin identity, preferences and saved statistics. IDE users do not need the desktop App. VS Code, Visual Studio, JetBrains, Zed and Xcode integrations are not supported.
+
+**Verification scope:** real local Windows App/IDE use plus automated data, lifecycle, package and Chromium regressions. Publication requires Windows/Linux/macOS CI and official desktop resource checks. Signed-in Linux/macOS GUI acceptance remains outstanding. README figures illustrate the desktop widget and are not live IDE screenshots.
 
 ## 中文摘要
 
-本版新增反重力自己的 **Antigravity IDE** 专用 VSIX。窄输入栏显示速率、缓存和
-上下文三个图标，拉宽后显示详细数值；修复真实会话识别、工具跟进请求漏计及
-悬浮卡轮询时反复刷新／滚动位置重置的问题。语言、引导和历史统计继续保留。
+本版为桌面 App 和独立 Antigravity IDE 增加本地 Token 用量统计：每日／每周活动格、按模型区分的天／周／月柱状图、主题配色和首次使用提示。缓存卡提供今日／本月入口。统计自动汇总可读取的本地历史，按请求去重；不保存对话正文，删除对话不会扣除已经记录的用量。这些统计不是账户账单，App 与 IDE 分开保存。
 
-IDE 用户可直接安装 `.vsix`，无需桌面 App。安装后完全退出 IDE，用带上述两个
-调试参数的快捷方式启动。Windows IDE 2.5.5 已实测；Linux/macOS IDE 的登录后
-界面尚待实机验证。其他编辑器中的 Antigravity 扩展暂未兼容。
+针对 Issue #8 加强 Token 与耗时配对，隔离计时可疑的样本，保留正常短回复与持续高速输出，不设置固定速率上限。异常计时不影响 Token、缓存或上下文统计。
 
-同时包含已合并 PR #7 的悬停优化及补充生命周期修复，感谢贡献者 @qwqZYLqwq。
+同时修复用量窗口偶发消失、刷新动效不稳定、关闭统计页后悬浮卡不收起等问题，并更新中英文演示图。CLI 功能保持原有范围。Windows 本地已实测；Linux/macOS 有自动化覆盖，登录后 GUI 仍待实机验收。

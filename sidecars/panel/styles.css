@@ -43,6 +43,7 @@ dd { margin:0; color:var(--pulse-foreground); font-size:11px; text-align:right; 
 .emphasis dd { color:var(--pulse-emphasis); font-weight:600; }
 .divider { padding-top:7px; border-top:1px solid var(--pulse-separator); }
 .card-footnote { margin:10px 0 0; color:var(--pulse-subtle); font-size:10px; line-height:1.6; }
+#speed-basis { white-space:pre-line; font-size:11px; line-height:1.65; }
 .balance { display:flex; align-items:baseline; gap:8px; margin:12px 0 13px; }
 .balance strong { font-size:28px; font-weight:550; letter-spacing:-.8px; font-variant-numeric:tabular-nums; }
 .balance > span { color:var(--pulse-muted); font-size:11px; }

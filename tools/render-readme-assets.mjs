@@ -9,11 +9,15 @@ import {trajectoryMetrics} from '../sidecars/panel/metrics.mjs';
 const repo=join(dirname(fileURLToPath(import.meta.url)),'..');
 const version=JSON.parse(await readFile(join(repo,'plugin.json'),'utf8')).version;
 const output=resolve(repo,process.argv.find(x=>x.startsWith('--output='))?.slice(9)||'docs/assets');
-const sources=await Promise.all(['i18n.cjs','theme.cjs','inline-widget.cjs'].map(f=>readFile(join(repo,'compat',f),'utf8')));
+const sources=await Promise.all(['i18n.cjs','theme.cjs','inline-widget.cjs','usage-ui.cjs'].map(f=>readFile(join(repo,'compat',f),'utf8')));
 const extract=s=>{assert.ok(s.includes('module.exports = '));return s.slice(s.indexOf('module.exports = ')+17).trim().replace(/;$/,'');};
-const install=`window.__agPulseI18nFactory=(${extract(sources[0])});window.__agPulseThemeFactory=(${extract(sources[1])});(${extract(sources[2])})();`;
+const install=`window.__agPulseI18nFactory=(${extract(sources[0])});window.__agPulseThemeFactory=(${extract(sources[1])});window.__agPulseUsageFactory=(${extract(sources[3])});(${extract(sources[2])})();`;
 const ids={main:'11111111-1111-1111-1111-111111111111',subagent:'22222222-2222-2222-2222-222222222222'};
 const now=Date.now(),files=[],diagnostics=[],errors=[];
+const today='2026-10-11',models=['Gemini 3.8 Flash','Claude Sonnet','GPT 5.4'];
+const days=Array.from({length:120},(_,i)=>{const d=new Date(today+'T00:00:00Z');d.setUTCDate(d.getUTCDate()-119+i);return {date:d.toISOString().slice(0,10),models:Object.fromEntries(models.map((m,j)=>{const n=(i*17+j*3)%11*1200;return [m,{uncached:n,cacheRead:n*2,cacheWrite:0,output:n,total:n*4,requests:n?1:0}];}))};});
+const total=ds=>ds.reduce((n,d)=>n+Object.values(d.models).reduce((sum,r)=>sum+r.total,0),0);
+const usage={accountKey:'illustrative',today,timeZone:'Asia/Shanghai',models,days,todayTokens:total(days.slice(-1)),weekTokens:total(days.slice(-7)),monthTokens:total(days.filter(d=>d.date.startsWith('2026-10'))),totalTokens:total(days),requests:days.reduce((n,d)=>n+Object.values(d.models).reduce((s,r)=>s+r.requests,0),0),firstDate:days[0].date,syncing:false,unknownRequests:0,partialRequests:0,unreadableFiles:0};
 const reset=ms=>new Date(now+ms).toISOString();
 function sample(scope){
  const sub=scope==='subagent';
@@ -25,7 +29,7 @@ function sample(scope){
   chatStartMetadata:{contextWindowMetadata:{estimatedTokensUsed:sub?24000:92000+i*5000,maxContextTokens:sub?200000:256000}},
   usage:{inputTokens:sub?3200:18850,cacheReadTokens:sub?9600:97600,responseOutputTokens:sub?640:1046,thinkingOutputTokens:sub?0:(i===4?405:406),outputTokens:sub?640:(i===4?1451:1452),apiProvider:sub?'API_PROVIDER_ANTHROPIC':'API_PROVIDER_GOOGLE_GEMINI'},
  }}))}});
- return {connection:'live',serverTime:new Date(now).toISOString(),quotaUpdatedAt:new Date(now).toISOString(),speed,groups:[
+ return {connection:'live',usage,serverTime:new Date(now).toISOString(),quotaUpdatedAt:new Date(now).toISOString(),speed,groups:[
   {id:'gemini',name:'Gemini',windows:{'5h':{available:true,remaining:.834,resetAt:reset(9978000)},weekly:{available:true,remaining:.617,resetAt:reset(393246000)}}},
   {id:'3p',name:'Claude / GPT',windows:{'5h':{available:true,remaining:.742,resetAt:reset(7812000)},weekly:{available:true,remaining:.469,resetAt:reset(327846000)}}},
  ]};
@@ -95,6 +99,17 @@ try{
     const boxes=await Promise.all([host.locator(`[data-card=${card}]`).boundingBox(),host.locator(`#${card}-card`).boundingBox()]);assert.ok(boxes.every(Boolean));
     const pad=20,left=Math.max(0,Math.min(...boxes.map(b=>b.x))-pad),top=Math.max(0,Math.min(...boxes.map(b=>b.y))-pad),right=Math.min(1000,Math.max(...boxes.map(b=>b.x+b.width))+pad),bottom=Math.min(920,Math.max(...boxes.map(b=>b.y+b.height))+pad);
     await save(page,`${card==='cache'?'widget':card}${suffix}.png`,{x:left,y:top,width:right-left,height:bottom-top});
+   }finally{await page.close();}
+  }
+  for(const kind of ['overview','details','intro']){
+   const page=await browser.newPage({viewport:{width:1200,height:900},deviceScaleFactor:2});page.on('pageerror',e=>errors.push(e.message));
+   try{
+    await page.goto(`${base}/fixture?lang=${lang}&scope=main&width=940`);await ready(page,'main','full');
+    await page.locator('[data-card=cache]').click();await page.locator('#open-usage').click();
+    if(kind!=='intro')await page.locator('#usage-intro-done').click();
+    if(kind==='details')await page.locator('#details-tab').click();
+    await page.evaluate(()=>document.fonts.ready);await page.waitForTimeout(150);
+    await page.locator('#usage-dashboard').screenshot({path:join(output,`usage-${kind}${suffix}.png`)});files.push(`usage-${kind}${suffix}.png`);
    }finally{await page.close();}
   }
  }

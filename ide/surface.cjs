@@ -7,7 +7,7 @@ module.exports = function createIdeSurface() {
     // VS Code requires TrustedHTML and owns all permitted policies. Build this
     // plugin's fixed template using DOM operations, without adding a policy or
     // weakening the host CSP. Never pass model responses or host HTML here.
-    const tags=new Set('style div span button strong section dl dt dd p i svg path circle ellipse rect'.split(' '));
+    const tags=new Set('style div span button strong section dl dt dd p i svg path circle ellipse rect header h1 h2 nav footer table thead tbody tr th td'.split(' '));
     const entities={amp:'&',lt:'<',gt:'>',quot:'"',apos:"'",nbsp:'\u00a0'};
     const decode=s=>s.replace(/&(#x[0-9a-f]+|#\d+|amp|lt|gt|quot|apos|nbsp);/gi,(all,key)=>key[0]==='#'?String.fromCodePoint(parseInt(key.slice(key[1]?.toLowerCase()==='x'?2:1),key[1]?.toLowerCase()==='x'?16:10)):entities[key]||all);
     const fragment=document.createDocumentFragment(),stack=[fragment];let offset=0;
@@ -97,5 +97,5 @@ module.exports = function createIdeSurface() {
     const children=[...branch.children].filter(e=>visible(e)&&e.id!=='ag-pulse-status-bar');
     return Math.ceil(children.reduce((sum,e)=>sum+(e.contains(model)?Math.max(modelWidth,e.getBoundingClientRect().width):e.getBoundingClientRect().width),0)+(parseFloat(style.columnGap)||0)*Math.max(0,children.length-1)+(parseFloat(style.paddingLeft)||0)+(parseFloat(style.paddingRight)||0)+2);
   }
-  return {findComposer,conversationId,conversationState,nativeReserve,setMarkup,showEmpty:true};
+  return {findComposer,conversationId,conversationState,nativeReserve,setMarkup,showEmpty:true,usageHostLabel:'Antigravity IDE'};
 };

@@ -5,6 +5,7 @@ import { createServer } from 'node:http';
 import { homedir } from 'node:os';
 import { createRequire } from 'node:module';
 import { MetricsStore } from './store.mjs';
+import { DesktopUsage } from './usage.mjs';
 import { loadSidecarSdk } from './sdk.mjs';
 import { RuntimeUi, makeRendererSource } from '../../compat/runtime-ui.mjs';
 import { platformPaths } from '../../compat/platform.mjs';
@@ -16,16 +17,22 @@ const HERE = dirname(fileURLToPath(import.meta.url));
 const createTheme=createRequire(import.meta.url)('../../compat/theme.cjs');
 const themeCss=()=>createTheme().css(':root');
 const store = new MetricsStore();
+const usage=new DesktopUsage(store);
+store.onTrajectory=(scope,id,raw)=>usage.ingest(scope,id,raw);
 const preferences=new PreferencesStore();
 const ownership=process.env.ANTIGRAVITY_SIDECAR_WEB_PORT?new SidecarOwner(platformPaths().data):null;
-const metrics = async input => ({ ...await store.snapshot(input), preferences:await preferences.snapshot(), theme:await readHostTheme(), integration: integration.health });
+const metrics = async input => {
+  const base=await store.snapshot(input);if(input?.force)void usage.sync();
+  return {...base,usage:await usage.snapshot(),preferences:await preferences.snapshot(),theme:await readHostTheme(),integration:integration.health};
+};
+const usageSource=()=>{const s=readFileSync(join(HERE,'..','..','compat','usage-ui.cjs'),'utf8');return `window.__agPulseUsageFactory=(${s.slice(s.indexOf('module.exports = ')+17).trim().replace(/;$/,'')});`;};
 const staticFiles = { '/': ['index.html', 'text/html'], '/app.js': ['app.js', 'text/javascript'], '/styles.css': ['styles.css', 'text/css'], '/format.mjs': ['format.mjs', 'text/javascript'] };
 const inlineSource=()=>{
   const file=readFileSync(join(HERE,'..','..','compat','inline-widget.cjs'),'utf8');
   const i18n=readFileSync(join(HERE,'..','..','compat','i18n.cjs'),'utf8');
   const theme=readFileSync(join(HERE,'..','..','compat','theme.cjs'),'utf8');
   const extract=s=>s.slice(s.indexOf('module.exports = ')+'module.exports = '.length).trim().replace(/;$/,'');
-  return `window.__agPulseI18nFactory=(${extract(i18n)});window.__agPulseThemeFactory=(${extract(theme)});(${extract(file)})();`;
+  return usageSource()+`window.__agPulseI18nFactory=(${extract(i18n)});window.__agPulseThemeFactory=(${extract(theme)});(${extract(file)})();`;
 };
 const i18nModule=()=>{const s=readFileSync(join(HERE,'..','..','compat','i18n.cjs'),'utf8');return 'export const createI18n='+s.slice(s.indexOf('module.exports = ')+'module.exports = '.length);};
 const themeModule=()=>{const s=readFileSync(join(HERE,'..','..','compat','theme.cjs'),'utf8');return 'export const createTheme='+s.slice(s.indexOf('module.exports = ')+'module.exports = '.length);};
@@ -39,7 +46,7 @@ const integration = new RuntimeUi({
   snapshot: input => metrics(input),
   preferences,
   owner:ownership?.token,owns:()=>ownership?ownership.isOwner():true,
-  source: makeRendererSource(readFileSync(join(HERE,'..','..','compat','i18n.cjs'),'utf8'),readFileSync(join(HERE,'..','..','compat','inline-widget.cjs'),'utf8'),readFileSync(join(HERE,'..','..','compat','theme.cjs'),'utf8'),ownership?.token,ownership?.startedAt),
+  source: makeRendererSource(readFileSync(join(HERE,'..','..','compat','i18n.cjs'),'utf8'),readFileSync(join(HERE,'..','..','compat','inline-widget.cjs'),'utf8'),readFileSync(join(HERE,'..','..','compat','theme.cjs'),'utf8'),ownership?.token,ownership?.startedAt,usageSource()),
   dataDir: platformPaths().data,
   enabled: () => { const s = runtimeSettings(); return s.enabled !== false && s.inline !== false && s.mode !== 'legacy'; },
 });

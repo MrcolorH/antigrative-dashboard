@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.8.0 — 2026-10-11
+
+- Add local Token usage to the desktop App and standalone IDE: daily/weekly contribution grids, day/week/month model stacks, model filtering, full-count tooltips/tables, and a compact two-column Today / This month cache-card entry. Theme-driven model colors follow custom accent/background changes.
+- Keep the usage frame stable across month changes, empty data, missing snapshots, account switches and composer replacement. Use a themed year menu and aligned controls; manual refresh queues behind polling and completes a visible rotation.
+- Explain local history import, UTC+8 date boundaries, coverage/billing limits and storage on first opening. Persist acknowledgment independently of language; save failures stay visible and retryable. Local replay controls are excluded from packaged collectors.
+- Address [#8](https://github.com/YOU-SHOULD-KNOW-ME/antigrative-dashboard/issues/8): pair response tokens with their own stream durations, quarantine inconsistent token/retry/duplicate scopes and suspicious brief tool-only windows, and use a same-model median/MAD baseline for short outliers. Do not cap sustained high throughput or invent generation time. Token/cache/context counts remain available.
+- Recalculate legacy saved TPS from complete trajectories, retaining other statistics and protecting full coverage from partial backend responses. An unreliable latest request stays unavailable rather than borrowing an older rate.
+- Fix hover cards staying open after closing usage: pointer-restored focus no longer reopens or pins a card; keyboard focus and Escape return remain supported. Desktop/IDE regressions cover the full return-and-hover flow.
+- Retain usage in a separate account-scoped `usage-v1` ledger, deduplicated by hashed request identity. No prompts, replies or credentials are stored. Available local history is backfilled; deleting chats does not erase already recorded consumption. Desktop and IDE ledgers stay separate; CLI behavior is unchanged.
+- Refresh English/Chinese illustrations from the current production renderer and add activity/model-chart previews. Add usage-window/onboarding coverage to the Windows/Linux/macOS CI and release gates. Signed-in Linux/macOS GUI acceptance remains outstanding.
+
 ## 0.7.0 — 2026-10-11
 
 - Add a dedicated VSIX adapter for Google's standalone Antigravity IDE. Keep host-specific DOM/conversation discovery separate from the shared renderer; narrow panes show three icons, wide panes expose values, and native controls retain their space.

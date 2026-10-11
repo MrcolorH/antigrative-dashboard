@@ -25,13 +25,23 @@ test('guide dismissal survives a fresh backend without selecting a language; old
 });
 
 test('Chinese and English survive a new backend and a renderer with empty origin storage',async t=>{
-  const {file,store}=await fixture(t);assert.deepEqual(await store.get(),{language:null,languageGuideDismissed:false,revision:0});
+  const {file,store}=await fixture(t);assert.deepEqual(await store.get(),{language:null,languageGuideDismissed:false,usageGuideDismissed:false,revision:0});
   const first=create(null),controller=connect(first,store);await controller.ready;await controller.toggle();
   assert.equal(first.language,'zh-CN');controller.dispose();
   const afterRestart=create(null),restored=connect(afterRestart,new PreferencesStore({file}));await restored.ready;
   assert.equal(afterRestart.language,'zh-CN');await restored.toggle();restored.dispose();
   const again=create(null);await connect(again,new PreferencesStore({file})).ready;assert.equal(again.language,'en');
-  const json=JSON.parse(await readFile(file,'utf8'));assert.deepEqual(Object.keys(json).sort(),['language','languageGuideDismissed','revision','schema']);
+  const json=JSON.parse(await readFile(file,'utf8'));assert.deepEqual(Object.keys(json).sort(),['language','languageGuideDismissed','revision','schema','usageGuideDismissed']);
+});
+
+test('usage onboarding completion persists independently of language and language onboarding',async t=>{
+  const {file,store}=await fixture(t);
+  await writeFile(file,JSON.stringify({schema:1,language:'zh-CN',languageGuideDismissed:true,revision:1}));
+  assert.equal((await store.get()).usageGuideDismissed,false,'Existing users also receive the new usage explanation');
+  await store.set({usageGuideDismissed:true});await store.set({language:'en'});
+  const saved=await new PreferencesStore({file}).get();assert.equal(saved.usageGuideDismissed,true);assert.equal(saved.languageGuideDismissed,true);assert.equal(saved.language,'en');
+  await assert.rejects(store.set({usageGuideDismissed:false}));await assert.rejects(store.set({usageGuideDismissed:'true'}));
+  const fresh=await fixture(t);await fresh.store.set({usageGuideDismissed:true});const first=await fresh.store.get();assert.equal(first.language,null);assert.equal(first.languageGuideDismissed,false);
 });
 
 test('existing browser choice migrates once; durable preference overrides stale browser storage',async t=>{

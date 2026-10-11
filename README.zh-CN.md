@@ -1,13 +1,13 @@
 <div align="center">
 
-<img src="docs/assets/hero-zh.png?v=0.6.3" width="100%" alt="Antigrative Dashboard v0.6.4：最新版速度、缓存和上下文控件，就在输入框旁。">
+<img src="docs/assets/hero-zh.png?v=0.8.0" width="100%" alt="Antigrative Dashboard v0.6.4：最新版速度、缓存和上下文控件，就在输入框旁。">
 
 # Antigrative Dashboard
 
 模型选择旁只显示生成速率、缓存和上下文占用；悬停上下文，一并查看上下文、5 小时和周额度详情。<br>
 缩略信息常驻；鼠标悬停，才展开详细统计。
 
-[![Version 0.7.0](https://img.shields.io/badge/version-0.7.0-91adff?style=flat-square&labelColor=252936)](CHANGELOG.md)
+[![Version 0.8.0](https://img.shields.io/badge/version-0.8.0-91adff?style=flat-square&labelColor=252936)](CHANGELOG.md)
 [![Platforms](https://img.shields.io/badge/host-Windows%20%7C%20Linux%20%7C%20macOS-83d8b9?style=flat-square&labelColor=252936)](COMPATIBILITY.md)
 [![Antigravity 2.21.1 / 2.22.0](https://img.shields.io/badge/Antigravity-2.21.1%20%2F%202.22.0-c5a0ff?style=flat-square&labelColor=252936)](COMPATIBILITY.md)
 [![MIT](https://img.shields.io/badge/license-MIT-d4d9e6?style=flat-square&labelColor=252936)](LICENSE)
@@ -16,17 +16,25 @@
 
 </div>
 
-**v0.7.0 更新：** 新增反重力自己的 **Antigravity IDE** 专用 VSIX：窄栏三个图标、拉宽显示数值，读取真实对话统计，保持悬浮卡轮询稳定。同时包含 PR #7 的悬停改进。其他编辑器里的 Antigravity 扩展暂未适配。[完整更新说明](https://github.com/YOU-SHOULD-KNOW-ME/antigrative-dashboard/releases/tag/v0.7.0)。
+**v0.8.0 更新：** 新增本地 Token 用量统计：每日/每周活动与天、周、月模型柱状图，加入首次使用提示；修复 [#8](https://github.com/YOU-SHOULD-KNOW-ME/antigrative-dashboard/issues/8) 的异常计时污染 TPS，以及用量窗口和悬浮卡交互问题。桌面 App 与独立 IDE 同步支持。[完整更新说明](https://github.com/YOU-SHOULD-KNOW-ME/antigrative-dashboard/releases/tag/v0.8.0)。
 
 ## 看看效果
 
-<img src="docs/assets/responsive-zh.png?v=0.6.3" width="100%" alt="最新版主对话窄窗口三图标布局，以及子代理输入框旁的独立统计。">
+<img src="docs/assets/responsive-zh.png?v=0.8.0" width="100%" alt="最新版主对话窄窗口三图标布局，以及子代理输入框旁的独立统计。">
 
 <table>
 <tr><th width="50%">生成速度与缓存</th><th width="50%">上下文与共享额度</th></tr>
 <tr>
-<td width="50%" valign="top"><img src="docs/assets/speed-zh.png?v=0.6.3" width="100%" alt="最新版生成速度详情卡"><br><img src="docs/assets/widget-zh.png?v=0.6.3" width="100%" alt="最新版 Token 用量与缓存详情卡"></td>
-<td width="50%" valign="top"><img src="docs/assets/context-zh.png?v=0.6.3" width="100%" alt="最新版上下文、5h 和周额度详情，以及持久化语言切换入口"></td>
+<td width="50%" valign="top"><img src="docs/assets/speed-zh.png?v=0.8.0" width="100%" alt="最新版生成速度详情卡"><br><img src="docs/assets/widget-zh.png?v=0.8.0" width="100%" alt="最新版 Token 用量与缓存详情卡"></td>
+<td width="50%" valign="top"><img src="docs/assets/context-zh.png?v=0.8.0" width="100%" alt="最新版上下文、5h 和周额度详情，以及持久化语言切换入口"></td>
+</tr>
+</table>
+
+<table>
+<tr><th width="50%">每日 / 每周活动</th><th width="50%">按模型统计用量</th></tr>
+<tr>
+<td width="50%"><img src="docs/assets/usage-overview-zh.png?v=0.8.0" width="100%" alt="最新版 Token 用量活动概览，支持每日和每周贡献图"></td>
+<td width="50%"><img src="docs/assets/usage-details-zh.png?v=0.8.0" width="100%" alt="最新版模型用量柱状图，支持天周月切换和主题配色"></td>
 </tr>
 </table>
 
@@ -55,7 +63,7 @@
 ## Antigravity IDE
 
 **v0.7.0** 新增反重力自己的独立 IDE 适配。下载发布页的
-`antigrative-dashboard-ide-0.7.0.vsix`，在 IDE 扩展页选择「从 VSIX 安装」。
+`antigrative-dashboard-ide-0.8.0.vsix`，在 IDE 扩展页选择「从 VSIX 安装」。
 仅安装 IDE 的用户也可以使用，无需先装桌面 App。
 
 完全退出 IDE 后，使用带
@@ -159,7 +167,7 @@ Antigravity 的 `inputTokens` 是未缓存输入。缓存率 = 缓存读取 ÷�
 | 项目 | 口径 |
 | --- | --- |
 | 会话 TPS | 有效请求的正文输出 token 总数 ÷ 对应流式时长总和 |
-| 最近一次 TPS | 最近有效请求正文 token ÷ 流式时长 |
+| 最近一次 TPS | 最近一次请求正文 token ÷ 流式时长；计时异常或缺失时不显示速率 |
 | TTFT | 请求首 token 时间的平均值；不计入正文流式 TPS |
 | 模型用时 | 请求 TTFT 与流式生成时长相加 |
 | 工具用时 | 工具执行区间合并后统计，重叠时间不重复计数 |
@@ -169,11 +177,32 @@ Antigravity 的 `inputTokens` 是未缓存输入。缓存率 = 缓存读取 ÷�
 统计来自已完成请求，约每 2.2 秒检查，不宣称逐 token 的即时速率。额度每 60 秒刷新，倒计时每秒走动。
 思考 token 单独列出；模型未拆分正文时会标明全部输出口径。缺少有效时长的请求不会计入 TPS。失联显示不可用或明确的旧数据状态。
 
+### 计时异常处理
+
+输出集中到达时，宿主可能只记录到几毫秒的流式时长，导致 TPS 虚高。这个短窗口不一定代表模型实际生成所用的时间。插件会先检查计时质量，再计算会话 TPS，不给速度设上限，也不编造更长的生成时长。
+
+- **不计入 TPS 的请求：** Token 统计范围不一致、同一请求的重复记录冲突、多次尝试的用量不同但没有各自对应的计时，以及计算结果无效。对于纯工具输出，如果流式时长不足 1 秒、TTFT 至少 2 秒，且 TTFT 至少是流式时长的 20 倍，也视为计时不可靠。
+- **同模型基线检查：** 至少有 5 次时长达到 1 秒的有效采样后，若短时采样的速率超过 `max(中位数 × 8，中位数 + MAD × 12)`，则不计入 TPS。基线限定为同一模型、供应商和 Token 口径；MAD 指各采样偏离中位数的绝对值的中位数。
+- **仍计入的请求：** 普通短文本请求和持续的高速度请求仍可参与统计，不因数值高就排除持续采样。异常请求的 Token 和缓存用量也完整保留；排除速率不等于删除请求或用量。
+- **界面与历史恢复：** 最近一次请求计时不可靠时显示“计时异常”，不拿上一条请求的速度代替。没有有效样本时 TPS 显示不可用。旧算法保存的速率会等待完整对话数据重新计算，Token、缓存与上下文保留，重载后不会重新使用旧的未校验 TPS。
+
+这些规则是针对宿主耗时摘要的保守判断，不代表已证实输出缓冲。当前本地接口未提供逐片段时间记录，无法恢复缺失的服务端生成时间。使用界面只保留简洁的统计方式，具体筛选规则在项目说明中解释。桌面版和独立 IDE 共用这些规则。详见[计时策略与限制](docs/TPS.md)，参考 DSH 讨论 [#7960](https://github.com/deepseek-ai/deepseek-harness/discussions/7960) 和 [#6129](https://github.com/deepseek-ai/deepseek-harness/discussions/6129)。
+
 ## 对话统计持久化
 
 已完成请求的 tok/s、cache 和数值统计自动保存到 `~/.gemini/antigravity/sidecar_data/antigravity-pulse/panel/data/history-v1/<账号哈希>/<对话ID>.json`。重载、重启、更新或重装插件都会保留。接口临时返回空数据或较少采样时，不覆盖已有有效统计；恢复值会在详情中注明保存时间。真实 0% 缓存命中率正常显示。
 
 只保存白名单数值、模型和状态，不保存正文、标题、邮箱或凭据。确认当前账号后才读取该账号的历史。已经缺失的请求时长无法重建。打开 Antigravity 后执行 `node tools/check-live-history.mjs`，可补存当前接口仍能读取的所有历史对话，并验证重启恢复。
+
+## 本地 Token 用量统计
+
+打开缓存 / 数据库图标，点击「查看用量统计」。入口以两列展示今日和本月用量；活动概览提供每日 / 每周贡献图，用量详情提供按模型区分的天、周、月柱状图。模型颜色跟随实际主题和强调色；K/M/B 摘要最多显示一位小数，表格与提示保留完整数值。
+
+首次使用提示说明历史导入、统计范围与隐私。点击「知道了」后保存完成状态，重启、换语言、换主题都不会重复弹出。直接关闭窗口则保留提示；保存失败可以重试。
+
+启动时汇总当前账号可读取的本地历史对话，此后每 60 秒检查历史；新完成请求随正常轮询记录。独立的 `usage-v1` 用量账本按账号去重，只保存时间、模型、Token 计数和哈希标识，不保存正文、回复或凭据。桌面与 IDE 账本独立。删除对话不会扣除已记录用量；这是本地已观察到的消耗，不是供应商账单，缺失或已删除的历史可能无法补齐。天、月按 UTC+8 划分，周一开始一周。
+
+桌面路径：`~/.gemini/antigravity/sidecar_data/antigravity-pulse/panel/data/usage-v1/`（宿主可覆盖数据目录）。IDE 路径：其用户目录下的 `User/globalStorage/you-should-know-me.antigrative-dashboard-ide/usage-v1/`。清理前先停用插件；再次启用后，仍可读取的对话会重新导入。`history-v1` 继续单独保存每个对话最新的统计快照。[统计口径、清理和边界](docs/USAGE.md)。
 
 ## 兼容性
 
