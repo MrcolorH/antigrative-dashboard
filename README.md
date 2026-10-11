@@ -44,7 +44,7 @@ Keep the summary visible. Hover for the details.
 - **Context and quotas together.** A Codex-style usage percentage; hover for used/remaining fractions, tokens versus capacity, and both quota windows with reset times. Uses the host estimate for the latest request, never cumulative input tokens.
 - **English or Chinese.** English by default, with one-click switching and a saved preference.
 - **Language survives restarts.** The inline widget and side panel share an atomic user preference file (`AntigravityPulse/preferences.json`), independent of the host's changing local port.
-- **Hover delay and instant transition.** Hovering over a metric waits for a short delay before opening its detail card to prevent accidental popups when sweeping across the composer row. Once engaged, or within a short transition window, moving between metrics switches detail cards immediately.
+- **Hover delay and instant transition.** First hover waits 250ms to prevent accidental popups; clicks and keyboard focus open immediately. Moving between metrics stays instant while a card is open or for 350ms after leaving the controls. Leaving early or replacing the conversation/composer cancels a pending popup.
 - **Stable menus.** Quota-group menus stay open across polling cycles while countdowns continue ticking.
 - **Actual account data.** Remaining quota comes from the account API, not an estimate based on text length. Expired windows do not automatically become 100%.
 - **Conversation-aware.** Switch chats without carrying the previous chat's throughput into a new one.

@@ -15,9 +15,9 @@ module.exports = function installAgPulseInlineWidget() {
   window.__agPulseInlineInstalled=true;
   report('boot',{hostFound:true});
   const ID='ag-pulse-status-bar';
-  let node=null,root=null,data=null,pending=false,cardName=null,hoverTimer=null,openTimer=null,lastWarmAt=0,lastConversation=null,lastFetch=0,lastExpiredRefresh=0,resizeObserver=null,groupMenu=null,themeController=null,changingCards=false;
+  let node=null,root=null,data=null,pending=false,cardName=null,hoverTimer=null,openTimer=null,warmUntil=0,lastConversation=null,lastFetch=0,lastExpiredRefresh=0,resizeObserver=null,groupMenu=null,themeController=null,changingCards=false;
   const HOVER_DELAY=250,WARM_WINDOW=350,LEAVE_DELAY=120;
-  const isWarm=()=>Boolean(cardName||(lastWarmAt>0&&Date.now()-lastWarmAt<WARM_WINDOW));
+  const isWarm=()=>Boolean(cardName||Date.now()<warmUntil);
   let chosen=localGet('ag-pulse-group'),group=null;
   let refreshRequest=null,manualRequest=null,requestEpoch=0,disposed=false;
   let composer=null,layoutFrame=null;
@@ -276,20 +276,21 @@ module.exports = function installAgPulseInlineWidget() {
     if(visible){element.hidden=false;if(element.hasAttribute('popover')&&!element.matches(':popover-open'))element.showPopover();}
     else {if(element.hasAttribute('popover')&&element.matches(':popover-open'))element.hidePopover();element.hidden=true;}
   }
-  function hide(){
+  function hide({keepWarm=false}={}){
     clearTimeout(openTimer);openTimer=null;
-    if(cardName)lastWarmAt=Date.now();
+    clearTimeout(hoverTimer);hoverTimer=null;
+    if(!keepWarm)warmUntil=0;
     changingCards=true;
     try{closeGroup();cardName=null;for(const e of root?.querySelectorAll('[data-card]')||[])e.setAttribute('aria-expanded','false');for(const e of root?.querySelectorAll('.card')||[])cardVisibility(e,false);}
     finally{changingCards=false;}
     updateGuide();
   }
   function show(name){
-    if(changingCards||node?.dataset.layout==='blocked')return;
+    if(disposed||!node?.isConnected||changingCards||node.dataset.layout==='blocked')return;
     if(cardName!==name)closeGroup();
-    clearTimeout(hoverTimer);
+    clearTimeout(hoverTimer);hoverTimer=null;
     clearTimeout(openTimer);openTimer=null;
-    cardName=name;lastWarmAt=Date.now();
+    cardName=name;warmUntil=0;
     for(const e of root.querySelectorAll('[data-card]'))e.setAttribute('aria-expanded',String(e.dataset.card===name));
     changingCards=true;
     try{for(const e of root.querySelectorAll('.card'))cardVisibility(e,e.id===`${name}-card`);}
@@ -304,8 +305,12 @@ module.exports = function installAgPulseInlineWidget() {
       show(name);
     }else{
       clearTimeout(openTimer);
+      const anchor=node,chip=root?.querySelector(`[data-card="${name}"]`),editor=composer?.editor,conversation=conversationId();
       openTimer=setTimeout(()=>{
         openTimer=null;
+        // A host route/composer replacement can detach the chip without a
+        // pointerleave. Never show a stale or disconnected top-layer popover.
+        if(disposed||node!==anchor||!anchor?.isConnected||!chip?.isConnected||!chip.matches(':hover')||composer?.editor!==editor||conversationId()!==conversation)return;
         show(name);
       },HOVER_DELAY);
     }
@@ -316,7 +321,9 @@ module.exports = function installAgPulseInlineWidget() {
   function scheduleHide(){
     clearTimeout(openTimer);openTimer=null;
     clearTimeout(hoverTimer);
-    hoverTimer=setTimeout(()=>{if(!cardEngaged())hide();},LEAVE_DELAY);
+    // Measure the warm window from pointer departure, not the later hide.
+    if(cardName)warmUntil=Date.now()+WARM_WINDOW;
+    hoverTimer=setTimeout(()=>{hoverTimer=null;if(!cardEngaged())hide({keepWarm:true});},LEAVE_DELAY);
   }
   function position(){
     positionGuide();
@@ -407,7 +414,7 @@ module.exports = function installAgPulseInlineWidget() {
   }
   function mount(){
     const found=findComposer();
-    if(!found){stopDensityMotion();densityFrame=null;densityProbe=null;composer=null;resizeObserver?.disconnect();if(node?.isConnected){hide();themeController?.dispose();themeController=null;node.remove();}return;}
+    if(!found){stopDensityMotion();densityFrame=null;densityProbe=null;composer=null;resizeObserver?.disconnect();if(node){hide();themeController?.dispose();themeController=null;node.remove();}return;}
     found.native=composer?.branch===found.branch?composer.native:captureNative(found);
     composer=found;
     if(syncConversation())render();
