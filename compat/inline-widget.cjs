@@ -15,7 +15,9 @@ module.exports = function installAgPulseInlineWidget() {
   window.__agPulseInlineInstalled=true;
   report('boot',{hostFound:true});
   const ID='ag-pulse-status-bar';
-  let node=null,root=null,data=null,pending=false,cardName=null,hoverTimer=null,lastConversation=null,lastFetch=0,lastExpiredRefresh=0,resizeObserver=null,groupMenu=null,themeController=null,changingCards=false;
+  let node=null,root=null,data=null,pending=false,cardName=null,hoverTimer=null,openTimer=null,warmUntil=0,lastConversation=null,lastFetch=0,lastExpiredRefresh=0,resizeObserver=null,groupMenu=null,themeController=null,changingCards=false;
+  const HOVER_DELAY=250,WARM_WINDOW=350,LEAVE_DELAY=120;
+  const isWarm=()=>Boolean(cardName||Date.now()<warmUntil);
   let chosen=localGet('ag-pulse-group'),group=null;
   let refreshRequest=null,manualRequest=null,requestEpoch=0,disposed=false;
   let composer=null,layoutFrame=null;
@@ -274,22 +276,54 @@ module.exports = function installAgPulseInlineWidget() {
     if(visible){element.hidden=false;if(element.hasAttribute('popover')&&!element.matches(':popover-open'))element.showPopover();}
     else {if(element.hasAttribute('popover')&&element.matches(':popover-open'))element.hidePopover();element.hidden=true;}
   }
-  function hide(){
+  function hide({keepWarm=false}={}){
+    clearTimeout(openTimer);openTimer=null;
+    clearTimeout(hoverTimer);hoverTimer=null;
+    if(!keepWarm)warmUntil=0;
     changingCards=true;
     try{closeGroup();cardName=null;for(const e of root?.querySelectorAll('[data-card]')||[])e.setAttribute('aria-expanded','false');for(const e of root?.querySelectorAll('.card')||[])cardVisibility(e,false);}
     finally{changingCards=false;}
     updateGuide();
   }
   function show(name){
-    if(changingCards||node?.dataset.layout==='blocked')return;
+    if(disposed||!node?.isConnected||changingCards||node.dataset.layout==='blocked')return;
     if(cardName!==name)closeGroup();
-    clearTimeout(hoverTimer);cardName=name;
+    clearTimeout(hoverTimer);hoverTimer=null;
+    clearTimeout(openTimer);openTimer=null;
+    cardName=name;warmUntil=0;
     for(const e of root.querySelectorAll('[data-card]'))e.setAttribute('aria-expanded',String(e.dataset.card===name));
     changingCards=true;
     try{for(const e of root.querySelectorAll('.card'))cardVisibility(e,e.id===`${name}-card`);}
     finally{changingCards=false;}
     updateGuide();
     position();
+  }
+  function hoverChip(name){
+    clearTimeout(hoverTimer);
+    if(isWarm()){
+      clearTimeout(openTimer);openTimer=null;
+      show(name);
+    }else{
+      clearTimeout(openTimer);
+      const anchor=node,chip=root?.querySelector(`[data-card="${name}"]`),editor=composer?.editor,conversation=conversationId();
+      openTimer=setTimeout(()=>{
+        openTimer=null;
+        // A host route/composer replacement can detach the chip without a
+        // pointerleave. Never show a stale or disconnected top-layer popover.
+        if(disposed||node!==anchor||!anchor?.isConnected||!chip?.isConnected||!chip.matches(':hover')||composer?.editor!==editor||conversationId()!==conversation)return;
+        show(name);
+      },HOVER_DELAY);
+    }
+  }
+  function leaveChip(){
+    clearTimeout(openTimer);openTimer=null;
+  }
+  function scheduleHide(){
+    clearTimeout(openTimer);openTimer=null;
+    clearTimeout(hoverTimer);
+    // Measure the warm window from pointer departure, not the later hide.
+    if(cardName)warmUntil=Date.now()+WARM_WINDOW;
+    hoverTimer=setTimeout(()=>{hoverTimer=null;if(!cardEngaged())hide({keepWarm:true});},LEAVE_DELAY);
   }
   function position(){
     positionGuide();
@@ -380,7 +414,7 @@ module.exports = function installAgPulseInlineWidget() {
   }
   function mount(){
     const found=findComposer();
-    if(!found){stopDensityMotion();densityFrame=null;densityProbe=null;composer=null;resizeObserver?.disconnect();if(node?.isConnected){hide();themeController?.dispose();themeController=null;node.remove();}return;}
+    if(!found){stopDensityMotion();densityFrame=null;densityProbe=null;composer=null;resizeObserver?.disconnect();if(node){hide();themeController?.dispose();themeController=null;node.remove();}return;}
     found.native=composer?.branch===found.branch?composer.native:captureNative(found);
     composer=found;
     if(syncConversation())render();
@@ -463,13 +497,16 @@ module.exports = function installAgPulseInlineWidget() {
     report('mounted',{editorFound:true,composerFound:true});
     observeComposer();
     for(const chip of root.querySelectorAll('[data-card]')){
-      chip.addEventListener('pointerenter',()=>show(chip.dataset.card));chip.addEventListener('focus',()=>show(chip.dataset.card));chip.addEventListener('click',()=>show(chip.dataset.card));
+      chip.addEventListener('pointerenter',()=>hoverChip(chip.dataset.card));chip.addEventListener('pointerleave',leaveChip);chip.addEventListener('focus',()=>show(chip.dataset.card));chip.addEventListener('click',()=>show(chip.dataset.card));
+    }
+    for(const card of root.querySelectorAll('.card')){
+      card.addEventListener('pointerenter',()=>clearTimeout(hoverTimer));card.addEventListener('pointerleave',scheduleHide);
     }
     // A host composer may focus its editor on bubbled clicks. Keep plugin
     // controls' mouse actions inside the shadow root while retaining their
     // default focus/click behavior and document-level outside-click dismissal.
     for(const type of ['pointerdown','mousedown','click'])root.addEventListener(type,event=>event.stopPropagation());
-    node.addEventListener('pointerenter',()=>clearTimeout(hoverTimer));node.addEventListener('pointerleave',()=>{hoverTimer=setTimeout(()=>{if(!cardEngaged())hide();},100);});
+    node.addEventListener('pointerenter',()=>clearTimeout(hoverTimer));node.addEventListener('pointerleave',scheduleHide);
     root.addEventListener('focusout',()=>setTimeout(()=>{if(!cardEngaged())hide();},0));
     for(const button of root.querySelectorAll('.group-trigger'))button.addEventListener('click',()=>{
       const menu=button.parentElement.querySelector('.group-menu');const opening=menu.hidden;closeGroup();if(opening){groupMenu=menu;menu.hidden=false;button.setAttribute('aria-expanded','true');}
@@ -576,7 +613,7 @@ module.exports = function installAgPulseInlineWidget() {
   const timerId=setInterval(()=>{mount();fit();tick();position();if(conversationId()!==lastConversation||Date.now()-lastFetch>(document.hidden?10000:2200))refresh();},1000);
   window.__agPulseDispose=()=>{
     disposed=true;requestEpoch++;pending=false;refreshRequest=null;stopDensityMotion();densityFrame=null;densityProbe=null;
-    clearInterval(timerId);clearTimeout(hoverTimer);if(layoutFrame!==null)cancelAnimationFrame(layoutFrame);observer.disconnect();resizeObserver?.disconnect();themeController?.dispose();preferences.dispose();hide();node?.remove();
+    clearInterval(timerId);clearTimeout(hoverTimer);clearTimeout(openTimer);if(layoutFrame!==null)cancelAnimationFrame(layoutFrame);observer.disconnect();resizeObserver?.disconnect();themeController?.dispose();preferences.dispose();hide();node?.remove();
     document.removeEventListener('keydown',onKey);document.removeEventListener('pointerdown',onPointer);
     document.removeEventListener('scroll',scheduleLayout,true);window.removeEventListener('resize',scheduleLayout);
     densityMedia.removeEventListener('change',stopDensityMotion);

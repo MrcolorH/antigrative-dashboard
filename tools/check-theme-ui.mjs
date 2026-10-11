@@ -263,6 +263,7 @@ try {
     await page.waitForFunction(mode=>document.getElementById('ag-pulse-status-bar')?.dataset.pulseTheme===mode,mode);
     for(const card of ['speed','cache','context']) {
       await host.locator(`[data-card=${card}]`).hover();
+      await host.locator(`#${card}-card`).waitFor({state:'visible'});
       const layering=await host.locator(`#${card}-card`).evaluate(element=>{
         const rect=element.getBoundingClientRect(),x=rect.x+rect.width/2,y=rect.y+40;
         let button=document.getElementById('test-scroll-bottom');
