@@ -10,9 +10,9 @@ The adapter uses the [official statusLine contract](https://antigravity.google/d
 
 Included in v0.6.0 and later release ZIPs. Download the package from [GitHub Releases](https://github.com/YOU-SHOULD-KNOW-ME/antigrative-dashboard/releases), extract it, then run the commands below from the extracted project directory.
 
-![Real signed-in CLI conversation](assets/cli-conversation.png)
+![Real signed-in CLI conversation with cache percentage](assets/cli-conversation.png?v=0.8.4-cli-1)
 
-Real Windows CLI 1.3.2 session, with the account email masked: context changed from 0% to 1.7% after two replies; the supplied cache read count was 0 and Claude/GPT weekly balance was 49.6% (yellow). The screenshot is live terminal output, not synthetic preview data.
+Real Linux CLI 1.3.3 session with Claude Sonnet 4.6 (Thinking), captured after two English replies: context 6.8%, current-request cache share 95.7%, and 13.1K cached-read tokens. The Chinese screenshot below comes from a separate two-reply Chinese session (cache 95.4%). Images render the captured terminal ANSI output with the account email masked; conversation text and metrics are not synthetic. These percentages describe the captured requests, not a guaranteed cache rate.
 
 Install `agy` using the [official instructions](https://antigravity.google/docs/cli/install/), then run these commands in the project directory. Linux/macOS: use `python3` instead of `python`.
 
@@ -81,9 +81,9 @@ Linux's third Sonnet request supplied input 182 and read 18,287 (99.0%); its thi
 
 ## 简体中文
 
-![真实中文 CLI 两轮对话及状态栏](assets/cli-conversation-zh.png)
+![真实中文 CLI 两轮对话及当前请求缓存率](assets/cli-conversation-zh.png?v=0.8.4-cli-1)
 
-从 [GitHub Releases](https://github.com/YOU-SHOULD-KNOW-ME/antigrative-dashboard/releases) 下载 v0.8.1 或更新安装包，解压后在项目目录运行以下命令。上图是旧版状态栏的 Windows CLI 1.3.2 真实两轮对话，邮箱已遮挡；上下文从 0% 变为 1.7%，读取为真实零值，Claude/GPT 周额度 49.6% 显示黄色。v0.8.1 增加下述缓存百分比功能。
+从 [GitHub Releases](https://github.com/YOU-SHOULD-KNOW-ME/antigrative-dashboard/releases) 下载 v0.8.1 或更新安装包，解压后在项目目录运行以下命令。上图是 Linux CLI 1.3.3 使用 Claude Sonnet 4.6 (Thinking) 的真实中文两轮对话：上下文 6.8%，当前请求缓存率 95.4%，缓存读取 13.1K Token。英文图来自独立的英文两轮对话，缓存率为 95.7%。图片由账号遮盖后的真实终端 ANSI 输出渲染，未替换对话或统计数值；这些数值只代表截图中的请求，不是缓存率承诺。
 
 通过 [Antigravity CLI 官方状态栏接口](https://antigravity.google/docs/cli/statusline/) 接入，要求 **Node.js 20+、Python 3.10+** 和支持该接口的 `agy`。Windows/Linux/macOS 共用实现；Linux/macOS 把以下 `python` 换为 `python3`。
 
