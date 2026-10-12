@@ -109,6 +109,9 @@ try{
     await chip(page,'speed').hover();await page.clock.runFor(100);
     await page.evaluate(()=>{window.savedComposer=document.querySelector('.rounded-composer');window.savedComposer.remove();});
     await page.clock.runFor(500);assert.equal(await host(page).count(),0);
+    // Restoring a control under a stationary pointer can legitimately emit a
+    // new pointerenter. Isolate cancellation of the removed control's timer.
+    await outside(page);
     await page.evaluate(()=>document.body.append(window.savedComposer));await page.clock.runFor(1000);
     assert.equal(await host(page).count(),1);assert.equal(await card(page,'speed').isVisible(),false);
     await outside(page);

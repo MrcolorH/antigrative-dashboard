@@ -7,7 +7,7 @@
 模型选择旁只显示生成速率、缓存和上下文占用；悬停上下文，一并查看上下文、5 小时和周额度详情。<br>
 缩略信息常驻；鼠标悬停，才展开详细统计。
 
-[![Version 0.8.1](https://img.shields.io/badge/version-0.8.1-91adff?style=flat-square&labelColor=252936)](CHANGELOG.md)
+[![Version 0.8.2](https://img.shields.io/badge/version-0.8.2-91adff?style=flat-square&labelColor=252936)](CHANGELOG.md)
 [![Platforms](https://img.shields.io/badge/host-Windows%20%7C%20Linux%20%7C%20macOS-83d8b9?style=flat-square&labelColor=252936)](COMPATIBILITY.md)
 [![Antigravity 2.21.1 / 2.22.0](https://img.shields.io/badge/Antigravity-2.21.1%20%2F%202.22.0-c5a0ff?style=flat-square&labelColor=252936)](COMPATIBILITY.md)
 [![MIT](https://img.shields.io/badge/license-MIT-d4d9e6?style=flat-square&labelColor=252936)](LICENSE)
@@ -16,7 +16,7 @@
 
 </div>
 
-**v0.8.1 更新：** 修复 [#9](https://github.com/YOU-SHOULD-KNOW-ME/antigrative-dashboard/issues/9) 的 Teamwork／多层子代理挂载与运行态消失问题；修复重新挂载后用量入口失效和语言不同步；新增已核实口径的 CLI 当前请求缓存率。[完整更新说明](https://github.com/YOU-SHOULD-KNOW-ME/antigrative-dashboard/releases/tag/v0.8.1)。
+**v0.8.2 更新：** 加强冷启动恢复：历史／接口错误不再误触发后台重扫；限制重复进程扫描；初始页面跳转后重新同步 CDP 上下文。[完整更新说明](https://github.com/YOU-SHOULD-KNOW-ME/antigrative-dashboard/releases/tag/v0.8.2)。
 
 ## 看看效果
 
@@ -64,7 +64,7 @@
 ## Antigravity IDE
 
 **v0.7.0** 新增反重力自己的独立 IDE 适配。下载发布页的
-`antigrative-dashboard-ide-0.8.1.vsix`，在 IDE 扩展页选择「从 VSIX 安装」。
+`antigrative-dashboard-ide-0.8.2.vsix`，在 IDE 扩展页选择「从 VSIX 安装」。
 仅安装 IDE 的用户也可以使用，无需先装桌面 App。
 
 完全退出 IDE 后，使用带

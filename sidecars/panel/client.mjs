@@ -15,17 +15,28 @@ export function serverFromDiscovery(log, processes) {
   return {port,csrf,pid:rows[0].ProcessId};
 }
 export class AntigravityClient {
-  constructor({paths=platformPaths,readLog=readFile,processes=discoverProcesses}={}) {
-    this.paths=paths;this.readLog=readLog;this.processes=processes;
+  constructor({paths=platformPaths,readLog=readFile,processes=discoverProcesses,now=Date.now}={}) {
+    this.paths=paths;this.readLog=readLog;this.processes=processes;this.now=now;
   }
   server = null;
   discoveredAt = 0;
   discovering = null;
+  lastScanAt = -Infinity;
+  retryAt = 0;
+  discoveryFailures = 0;
+  discoveryError = null;
 
   async discover(force = false) {
-    if (!force && this.server && Date.now() - this.discoveredAt < 15000) return this.server;
+    if (!force && this.server && this.now() - this.discoveredAt < 15000) return this.server;
     if (this.discovering) return this.discovering;
-    this.discovering = this.discoverNow().finally(() => { this.discovering = null; });
+    if (!force && this.discoveryError && this.now() < this.retryAt) throw this.discoveryError;
+    this.lastScanAt=this.now();
+    this.discovering = this.discoverNow().then(server=>{
+      this.discoveredAt=this.now();this.discoveryFailures=0;this.discoveryError=null;this.retryAt=0;return server;
+    }).catch(error=>{
+      this.discoveryError=error;this.discoveryFailures++;
+      this.retryAt=this.now()+Math.min(30000,3000*2**Math.min(4,this.discoveryFailures-1));throw error;
+    }).finally(() => { this.discovering = null; });
     return this.discovering;
   }
 
@@ -49,7 +60,7 @@ export class AntigravityClient {
       }
     }
     if(!this.server)throw lastError||new Error(foundLog?'等待 Antigravity 本地接口启动':'未找到 Antigravity 语言服务日志，请检查日志路径');
-    this.discoveredAt = Date.now();
+    this.discoveredAt = this.now();
     return this.server;
   }
 
@@ -64,7 +75,7 @@ export class AntigravityClient {
           res.setEncoding('utf8');
           res.on('data', chunk => { text += chunk; if (text.length > 32 * 1024 * 1024) req.destroy(new Error('会话数据超过采集上限')); });
           res.on('end', () => {
-            if (res.statusCode !== 200) return reject(new Error(`Antigravity 接口 ${method} 返回 ${res.statusCode}`));
+            if (res.statusCode !== 200) return reject(Object.assign(new Error(`Antigravity 接口 ${method} 返回 ${res.statusCode}`),{status:res.statusCode}));
             try { resolve(JSON.parse(text)); } catch { reject(new Error('Antigravity 接口返回了无法解析的数据')); }
           });
         });
@@ -73,8 +84,16 @@ export class AntigravityClient {
         req.end(data);
       });
     } catch (error) {
-      this.server = null;
-      if (retry) { await this.discover(true); return this.call(method, body, false); }
+      // A missing historical cascade, busy API or malformed response does not
+      // prove the process/credential changed. Do not launch CIM scans for it.
+      const endpointLost=[401,403].includes(error.status)||['ECONNREFUSED','ECONNRESET','EPIPE','ENOTCONN'].includes(error.code);
+      if(!endpointLost)throw error;
+      // A late failure from an old endpoint cannot invalidate a newer one.
+      if(this.server===server){
+        this.server=null;this.discoveryError=error;
+        this.retryAt=Math.max(this.retryAt,this.lastScanAt+3000);
+      }
+      if(retry){await this.discover();return this.call(method,body,false);}
       throw error;
     }
   }

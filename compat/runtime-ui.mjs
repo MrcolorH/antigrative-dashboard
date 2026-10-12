@@ -153,12 +153,25 @@ export class RuntimeUi {
   async event(connection, message) {
     if(this.stopping||!await this.owns())return;
     const p = message.params || {};
-    if (message.method === 'Runtime.executionContextCreated') {
-      if (p.context?.auxData?.isDefault && p.context.auxData.frameId === connection.frameId && p.context.origin === connection.origin) connection.contexts.add(p.context.id);
+    if(message.method==='Page.frameNavigated'&&p.frame&&!p.frame.parentId){
+      const replaced=connection.frameId!==p.frame.id;
+      connection.frameId=p.frame.id;connection.contexts.clear();connection.mounted=false;
+      const trusted=p.frame.url===connection.origin||p.frame.url?.startsWith(connection.origin+'/');
+      // With an unchanged frame ID, prior document contexts may not yet have
+      // emitted their destruction events. Replay them on the next heartbeat.
+      if(replaced&&trusted)for(const [id,context]of connection.contextCandidates)if(context.frameId===connection.frameId&&context.origin===connection.origin)connection.contexts.add(id);
       return;
     }
-    if (message.method === 'Runtime.executionContextsCleared') { connection.contexts.clear(); return; }
-    if (message.method === 'Runtime.executionContextDestroyed') { connection.contexts.delete(p.executionContextId); return; }
+    if (message.method === 'Runtime.executionContextCreated') {
+      if(p.context?.auxData?.isDefault){
+        connection.contextCandidates.set(p.context.id,{frameId:p.context.auxData.frameId,origin:p.context.origin});
+        if(connection.contextCandidates.size>32)connection.contextCandidates.delete(connection.contextCandidates.keys().next().value);
+        if(p.context.auxData.frameId===connection.frameId&&p.context.origin===connection.origin)connection.contexts.add(p.context.id);
+      }
+      return;
+    }
+    if (message.method === 'Runtime.executionContextsCleared') { connection.contexts.clear();connection.contextCandidates.clear();connection.mounted=false;return; }
+    if (message.method === 'Runtime.executionContextDestroyed') { connection.contexts.delete(p.executionContextId);connection.contextCandidates.delete(p.executionContextId);return; }
     if (message.method !== 'Runtime.bindingCalled' || p.name !== this.binding || !connection.contexts.has(p.executionContextId)) return;
     if (typeof p.payload !== 'string' || p.payload.length > 4096 || connection.inflight >= 8) return;
     let input;
@@ -189,12 +202,13 @@ export class RuntimeUi {
     let connection;
     connection = this.connect(target.webSocketDebuggerUrl, { onEvent: message => { void this.event(connection, message); } });
     connection.origin = this.targetOrigin(target);
-    connection.contexts = new Set(); connection.inflight = 0; connection.mounted = false;
+    connection.contexts = new Set();connection.contextCandidates=new Map(); connection.inflight = 0; connection.mounted = false;
     try {
       await connection.open();
       if(this.stopping||!await this.owns())throw new Error('Sidecar ownership changed');
       const frame = await connection.command('Page.getFrameTree'); connection.frameId = frame.frameTree?.frame?.id;
       if (!connection.frameId) throw new Error('Main renderer frame unavailable');
+      await connection.command('Page.enable');
       await connection.command('Runtime.enable');
       await connection.command('Runtime.addBinding', { name: this.binding });
       const guardedSource = 'if (location.origin === ' + JSON.stringify(connection.origin) + ') {' + this.source + '}';
@@ -229,8 +243,16 @@ export class RuntimeUi {
       if (this.stopping||!await this.owns()) { await this.detachAll(); return; }
       for (const [url, connection] of this.sessions) {
         try {
+          // Cold-start navigation may replace the top frame or lose its context
+          // events while hooks still exist. Resynchronize on the same socket.
+          if(!connection.contexts.size){
+            const frame=await connection.command('Page.getFrameTree');connection.frameId=frame.frameTree?.frame?.id;
+            connection.contextCandidates.clear();
+            await connection.command('Runtime.disable');await connection.command('Runtime.enable');
+          }
           const result = await connection.command('Runtime.evaluate', { returnByValue: true,
             expression: '({mounted:Boolean(document.getElementById("ag-pulse-status-bar")?.isConnected),installed:Boolean(window.__agPulseInlineInstalled),bridge:Boolean(window.__agPulseRuntimeBridge && window.agPulseHost'+(this.owner?' && window.__agPulseRuntimeBridge.binding==='+JSON.stringify(this.binding):'')+')})' });
+          if(result.exceptionDetails)throw new Error('Renderer document is not ready');
           const status = result.result?.value;
           connection.mounted = status?.mounted === true;
           // Startup can swap the document between discovery and first injection.
@@ -240,7 +262,11 @@ export class RuntimeUi {
             const recovery = await connection.command('Runtime.evaluate', { expression: connection.guardedSource });
             if (recovery.exceptionDetails) throw new Error('Widget recovery failed');
           }
-        } catch { connection.close(); this.sessions.delete(url); }
+        } catch {
+          // Navigation failures must not accumulate a preload on each retry.
+          try{if(connection.script)await connection.command('Page.removeScriptToEvaluateOnNewDocument',{identifier:connection.script});}catch{}
+          connection.close();this.sessions.delete(url);
+        }
       }
       await this.setHealth([...this.sessions.values()].some(c => c.mounted) ? 'mounted' : this.sessions.size ? 'waiting-for-composer' : 'waiting',
         this.sessions.size ? 'Renderer connected; waiting for a conversation composer if needed' : 'Waiting for the app renderer');

@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.8.2 — 2026-10-12
+
+- Separate App RPC/application failures from endpoint loss. Missing historical trajectories, HTTP 4xx/5xx other than credential failures, and malformed responses no longer trigger process discovery. Coalesce concurrent discovery and back off failed cold starts from 3 seconds to a maximum of 30 seconds; transport/credential failures still recover automatically with bounded scans.
+- Track top-frame navigation and default execution contexts, including reversed event ordering. If hooks exist without a trusted main context, resynchronize Runtime events on the same socket. Navigation exceptions remove the failed session's preload before reconnecting. Keep remote/iframe contexts excluded.
+- Add local HTTP regressions for history errors, cold-start/auth cooldown and backend restarts, plus real Chromium/CDP delayed-composer and interrupted-navigation coverage. The reporting user's exact environment and failure remain unverified; these tests do not establish the cause of every cold-start failure.
+
+- Isolate pending-hover cancellation from fresh pointer entry in the composer-remount browser regression; retain the cold-hover and auto-dismiss assertions.
+
 ## 0.8.1 — 2026-10-12
 
 - Address [#9](https://github.com/YOU-SHOULD-KNOW-ME/antigrative-dashboard/issues/9) in the App runtime adapter: retain the widget during send/stop/cancel transitions, discover static Teamwork badges without title/span assumptions, and scope visible editors/model controls to their nearest composer owner. Ignore hidden/inert and deeper nested editors; reject ambiguous anchors.

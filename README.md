@@ -7,7 +7,7 @@
 Token throughput, cache hits and context usage in the model selector row. Hover over context for five-hour and weekly quotas too.<br>
 Keep the summary visible. Hover for the details.
 
-[![Version 0.8.1](https://img.shields.io/badge/version-0.8.1-91adff?style=flat-square&labelColor=252936)](CHANGELOG.md)
+[![Version 0.8.2](https://img.shields.io/badge/version-0.8.2-91adff?style=flat-square&labelColor=252936)](CHANGELOG.md)
 [![Platforms](https://img.shields.io/badge/host-Windows%20%7C%20Linux%20%7C%20macOS-83d8b9?style=flat-square&labelColor=252936)](COMPATIBILITY.md)
 [![Antigravity 2.21.1 / 2.22.0](https://img.shields.io/badge/Antigravity-2.21.1%20%2F%202.22.0-c5a0ff?style=flat-square&labelColor=252936)](COMPATIBILITY.md)
 [![MIT](https://img.shields.io/badge/license-MIT-d4d9e6?style=flat-square&labelColor=252936)](LICENSE)
@@ -16,7 +16,7 @@ Keep the summary visible. Hover for the details.
 
 </div>
 
-**v0.8.1:** Fix Teamwork and nested subagent mounting/working-state visibility for [#9](https://github.com/YOU-SHOULD-KNOW-ME/antigrative-dashboard/issues/9), restore clickable usage windows and synchronized languages after remount, and add tested current-request CLI cache percentages. [Full release notes](https://github.com/YOU-SHOULD-KNOW-ME/antigrative-dashboard/releases/tag/v0.8.1).
+**v0.8.2:** Improve cold-start recovery: isolate historical/API failures from endpoint loss, bound process rediscovery, and resynchronize CDP contexts after startup navigation. [Full release notes](https://github.com/YOU-SHOULD-KNOW-ME/antigrative-dashboard/releases/tag/v0.8.2).
 
 ## Preview
 
@@ -68,7 +68,7 @@ Keep the summary visible. Hover for the details.
 ## Antigravity IDE
 
 **v0.7.0** adds a separate VSIX for Google's own standalone IDE. Download
-`antigrative-dashboard-ide-0.8.1.vsix` from the release and choose **Install from VSIX…**
+`antigrative-dashboard-ide-0.8.2.vsix` from the release and choose **Install from VSIX…**
 in the IDE's Extensions view. No desktop App installation is required.
 
 Fully quit the IDE, then start it with
@@ -83,7 +83,7 @@ See [IDE installation, update, diagnostics and data cleanup](ide/README.md).
 
 ## Antigravity CLI status line
 
-Available in **v0.6.0**: an independent adapter for the official Antigravity CLI `statusLine` interface displays context occupancy, cache read tokens, state and grouped quotas, with English/Chinese and terminal-width adaptation. Remaining quota numbers and bars are **green ≥70%, yellow ≥30% and <70%, red <30%**. Preview: `node cli/statusline.mjs --preview`; install: `python manage.py install-cli` (Linux/macOS: `python3`). Requires Node.js 20+ and a CLI supporting the interface. Version 0.8.1 prioritizes current-request cache percentage for tested CLI 1.3.2/1.3.3 Sonnet 4.6 and GPT-OSS 120B counters, plus Gemini 3.8 Flash (High) on CLI 1.3.3, with zero cache writes; unknown cases stay unavailable. CLI tok/s needs streaming-duration data absent from the documented payload. See [CLI usage and rollback](docs/CLI.md).
+Available in **v0.6.0**: an independent adapter for the official Antigravity CLI `statusLine` interface displays context occupancy, cache read tokens, state and grouped quotas, with English/Chinese and terminal-width adaptation. Remaining quota numbers and bars are **green ≥70%, yellow ≥30% and <70%, red <30%**. Preview: `node cli/statusline.mjs --preview`; install: `python manage.py install-cli` (Linux/macOS: `python3`). Requires Node.js 20+ and a CLI supporting the interface. Version 0.8.2 prioritizes current-request cache percentage for tested CLI 1.3.2/1.3.3 Sonnet 4.6 and GPT-OSS 120B counters, plus Gemini 3.8 Flash (High) on CLI 1.3.3, with zero cache writes; unknown cases stay unavailable. CLI tok/s needs streaming-duration data absent from the documented payload. See [CLI usage and rollback](docs/CLI.md).
 
 ![Real Antigravity CLI conversation with the dashboard](docs/assets/cli-conversation.png)
 

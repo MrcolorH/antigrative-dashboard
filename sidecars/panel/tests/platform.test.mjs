@@ -83,7 +83,7 @@ test('fallback never selects a log port owned by another process or conceals rea
     readLog:async()=> 'listening on random port at 9999 for HTTP\n'});
   await assert.rejects(client.discover(),/接口启动/);assert.equal(client.server,null);
   client.readLog=async()=>{throw Object.assign(new Error('permission denied'),{code:'EACCES'});};
-  await assert.rejects(client.discover(),/permission denied/);
+  await assert.rejects(client.discover(true),/permission denied/);
 });
 
 test('netstat isolates exact PIDs, IPv4/IPv6 and listening TCP ports',()=>{

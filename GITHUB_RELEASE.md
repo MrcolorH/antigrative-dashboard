@@ -1,45 +1,39 @@
-# Antigrative Dashboard v0.8.1
+# Antigrative Dashboard v0.8.2
 
-## Teamwork and nested subagents — Issue #9
+## Cold-start recovery
 
-- Match the active composer's own visible editor and controls. Ignore hidden/inert editors and descendants owned by deeper agent inputs.
-- Recognize send, stop, cancel, tooltip and English/Chinese ARIA control semantics. Generation no longer invalidates the composer solely because its action button changes.
-- Discover static icon/text badges without requiring title/span; measure painted text safely and reject ambiguous anchors.
-- Prefer the current composer's nearest valid data-cascade-id over the parent route. Invalid explicit IDs clear conversation statistics; late responses cannot overwrite the current agent's metrics.
+- Separate application/RPC errors from endpoint loss. An unavailable historical conversation, ordinary API error or malformed response no longer clears a healthy endpoint and triggers another process scan.
+- Coalesce concurrent discovery. Failed cold starts use a 3-second initial delay with exponential backoff capped at 30 seconds. Connection refusal/reset and credential failures still recover automatically, with a scan cooldown.
+- A late failure from an old endpoint cannot invalidate a newly discovered endpoint. Existing PID/port/credential pairing and loopback restrictions remain in place.
+- Track top-frame navigation and trusted default contexts, including context creation arriving before navigation. If hooks exist without a tracked main context, resynchronize Runtime events on the same socket.
+- Reject prior contexts at navigation and remove a failed session's preload before reconnecting, so repeated navigation errors do not accumulate injection scripts.
 
-## Usage-window lifecycle and language fixes
+The renderer already waits for the DOM and observes composer creation; this release does not assume every loading delay is a renderer bug. Historical usage import remains enabled, with conversation errors isolated from connection recovery.
 
-- Recreate the strip and usage controller together after a closed-dialog composer teardown. Fix **View token usage** becoming unresponsive after subagent navigation.
-- Invalidate pending requests from discarded mounts.
-- Context language choices update Today / This month / View token usage immediately and keep the statistics window synchronized.
-- Preserve an already-open account usage window across composer replacement and pointer/keyboard hover dismissal when returning to chat.
+## Verification and limits
 
-## CLI current-request cache percentages
-
-- Prioritize cache percentage, with read tokens as secondary text when terminal width permits.
-- Support empirically checked CLI 1.3.2/1.3.3 Sonnet 4.6 and GPT-OSS 120B scopes, plus CLI 1.3.3 Gemini 3.8 Flash (High), with zero cache writes. Use cacheRead / (input + cacheRead) for these scopes.
-- Busy/tool/initializing zero-cache snapshots show **Cache --**, instead of treating temporary zero counters as completed 0% hits. Valid idle zero reads still show 0%; available nonzero busy counters remain usable.
-- Unknown semantics remain unavailable. Do not borrow a previous request's percentage or include output tokens in the denominator.
-
-See [CLI counter semantics](https://github.com/YOU-SHOULD-KNOW-ME/antigrative-dashboard/blob/v0.8.1/docs/CLI.md). CLI tok/s still requires streaming-duration data absent from the documented payload.
+- Local HTTP regressions cover unavailable history, malformed responses, concurrent discovery, cold-start/auth cooldown and backend port/PID restarts.
+- In the synthetic application-error scenario, process discovery drops from 39 scans to 1; this is a regression result, not a measurement of the reporting user's machine.
+- Real Chromium/CDP tests cover five rounds of delayed composer creation and interrupted startup navigation, recovering live metrics without disable/enable.
+- Protocol fixtures cover top-frame replacement, reversed event order, missing context events, and remote/iframe exclusion.
+- The remount hover regression moves the pointer away before restoring controls, isolating cancellation of the removed control's timer from a legitimate new pointer entry.
+- Publication requires Windows/Linux/macOS automated tests, package checks and official desktop resource checks. The reporting user's exact environment and original failure remain unverified; signed-in Linux/macOS GUI acceptance is still outstanding.
 
 ## Downloads and update
 
-- **App / CLI:** antigrative-dashboard-0.8.1.zip and .zip.sha256. Extract and run `python manage.py install` for App or `python manage.py install-cli` for CLI. Use python3 on Linux/macOS. Confirm your host before choosing the installer.
-- **Standalone Antigravity IDE:** antigrative-dashboard-ide-0.8.1.vsix and .vsix.sha256. Use **Install from VSIX...** and retain the documented loopback remote-debugging launch flags.
+- **Desktop App / CLI:** `antigrative-dashboard-0.8.2.zip` and `.zip.sha256`. Extract and use `python manage.py install` for App or `python manage.py install-cli` for CLI. Use python3 on Linux/macOS.
+- **Standalone Antigravity IDE:** `antigrative-dashboard-ide-0.8.2.vsix` and `.vsix.sha256`. Install from VSIX and retain the documented loopback debugging launch flags. Shared client/runtime fixes are included; these changes were not diagnosed as an IDE-specific report.
 
-Plugin identity, preferences and recorded usage are retained. Shared usage fixes are included in the IDE package; desktop Teamwork discovery belongs to the App adapter. VS Code, Visual Studio, JetBrains, Zed and Xcode integrations remain unsupported.
+After installing the App/IDE update, fully quit and reopen the host so its collector loads the new modules. No language preferences, historical statistics or usage-ledger data are cleared. CLI metrics and rendering are unchanged from v0.8.1. Other editor integrations remain unsupported.
 
-## Verification scope
+## Report a recurring problem
 
-Windows real App checks cover main-to-three-level subagent delegation, independent metrics, return navigation and a generating-state screenshot. Real App usage checks confirm opening and English/Chinese synchronization. Chromium regressions cover six-level nested DOM, unchanged-route ownership, working controls, late responses, ambiguity and main/subagent usage remounts. Shared usage tests cover App and IDE, including Trusted Types.
-
-CLI numerical tests cover Windows and Linux, with tested server CLI/model samples. Publication is gated by Windows/Linux/macOS data, lifecycle, Chromium, package and official desktop resource checks. Signed-in Linux/macOS GUI acceptance remains outstanding; fixtures do not establish support for every future host layout.
+Please [open an Issue](https://github.com/YOU-SHOULD-KNOW-ME/antigrative-dashboard/issues/new) with the OS/version, host type (App/IDE/CLI), host and plugin versions, installation method, reproduction steps/frequency, exact error text, screenshots and relevant logs. Mention whether disable/enable or restart restores operation. Redact credentials, account details and private conversation contents before posting public logs.
 
 ## 中文摘要
 
-修复 Issue #9：Teamwork 与多层子代理的输入框定位、生成时控件消失、无 title/span 徽章异常，以及子代理会话归属和旧请求串数据问题。额外修复切换子代理后「查看用量统计」失效，以及从上下文详情切换中英文后用量入口和统计页面不同步。
+本版针对冷启动会话发现与注入恢复进行加固：区分会话／接口错误和后台连接失效，避免历史请求报错触发反复进程重扫；合并并发扫描，失败时以 3～30 秒退避重试；页面初始跳转后重新同步主渲染上下文，并清理失败的注入脚本。
 
-CLI 新增已实测口径的当前请求缓存率；运行或工具执行期间的临时零值显示「Cache --」，不再误报完成请求的 0%。未知口径保留不可用，不借用上一轮数据。
+更新后请完整退出并重新打开 App／IDE，以加载新的采集模块。保留语言设置、历史统计和用量记录，不会清空本地数据。用户原始故障仍需结合其版本和日志进一步确认。
 
-提供 App/CLI ZIP 与独立 IDE VSIX，保留已有偏好和用量记录；其他编辑器扩展尚未兼容。
+若再次遇到类似问题，请到项目下提交 Issue，并尽量附上系统和版本、使用端、宿主与插件版本、安装方式、复现步骤和频率、错误提示、截图及相关日志，以及禁用／启用或重启是否能恢复。公开日志前请遮盖凭据、账号和对话隐私。

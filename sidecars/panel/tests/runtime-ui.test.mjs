@@ -84,6 +84,33 @@ test('a startup document replacement reinstalls missed hooks on the next heartbe
   await ui.stop();
 });
 
+test('a top-frame swap adopts its context even when creation arrives before navigation',async()=>{
+ const {ui,connections,state}=fixture();await ui.tick();const c=connections[0];
+ await ui.event(c,{method:'Runtime.executionContextCreated',params:{context:{id:9,origin:c.origin,auxData:{isDefault:true,frameId:'replacement'}}}});
+ await ui.event(c,{method:'Page.frameNavigated',params:{frame:{id:'replacement',url:c.origin+'/c/new'}}});
+ const request=id=>({method:'Runtime.bindingCalled',params:{name:ui.binding,executionContextId:id,payload:JSON.stringify({id:1,type:'metrics',input:{}})}});
+ await ui.event(c,request(7));assert.equal(state.calls,0,'Old top frame must lose access');
+ await ui.event(c,request(9));assert.equal(state.calls,1,'New main context works without disable/enable');
+ await ui.stop();
+});
+
+test('installed hooks with no tracked main context resynchronize Runtime events',async()=>{
+ const {ui,connections,state}=fixture();await ui.tick();const c=connections[0];
+ c.contexts.clear();const count=c.calls.filter(x=>x.method==='Runtime.enable').length;
+ await ui.tick();await new Promise(r=>setImmediate(r));
+ assert.equal(c.calls.filter(x=>x.method==='Runtime.enable').length,count+1);
+ await ui.event(c,{method:'Runtime.bindingCalled',params:{name:ui.binding,executionContextId:7,payload:JSON.stringify({id:1,type:'metrics',input:{}})}});
+ assert.equal(state.calls,1);assert.equal(connections.length,1);
+ await ui.stop();
+});
+
+test('top-frame navigation revokes old contexts before the destroy event arrives',async()=>{
+ const {ui,connections,state}=fixture();await ui.tick();const c=connections[0];
+ await ui.event(c,{method:'Page.frameNavigated',params:{frame:{id:'main',url:'https://example.com/'}}});
+ await ui.event(c,{method:'Runtime.bindingCalled',params:{name:ui.binding,executionContextId:7,payload:JSON.stringify({id:1,type:'metrics',input:{}})}});
+ assert.equal(state.calls,0);assert.equal(c.contexts.size,0);await ui.stop();
+});
+
 test('disable disposes UI, intervals and navigation hooks; reenable attaches once', async () => {
   const { ui, state, connections } = fixture(); await ui.tick(); state.enabled = false; await ui.tick();
   assert.equal(ui.sessions.size, 0); assert.equal(connections[0].closed, true); assert.equal(ui.health.state, 'disabled');
