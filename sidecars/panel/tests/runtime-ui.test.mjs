@@ -11,7 +11,7 @@ class FakeConnection {
   async command(method, params = {}) {
     this.calls.push({ method, params });
     if (method === 'Page.getFrameTree') return { frameTree: { frame: { id: 'main' } } };
-    if (method === 'Runtime.enable') this.options.onEvent({ method: 'Runtime.executionContextCreated', params: { context: { id: 7, origin: 'https://127.0.0.1:5000', auxData: { isDefault: true, frameId: 'main' } } } });
+    if (method === 'Runtime.enable') this.options.onEvent({ method: 'Runtime.executionContextCreated', params: { context: { id: 7, origin: this.origin || 'https://127.0.0.1:5000', auxData: { isDefault: true, frameId: 'main' } } } });
     if (method === 'Page.addScriptToEvaluateOnNewDocument') return { identifier: 'script' };
     if (method === 'Runtime.evaluate') return { result: { value: {mounted:true,installed:true,bridge:true} } };
     return {};
@@ -97,8 +97,10 @@ test('a top-frame swap adopts its context even when creation arrives before navi
 test('installed hooks with no tracked main context resynchronize Runtime events',async()=>{
  const {ui,connections,state}=fixture();await ui.tick();const c=connections[0];
  c.contexts.clear();const count=c.calls.filter(x=>x.method==='Runtime.enable').length;
+ const bindings=c.calls.filter(x=>x.method==='Runtime.addBinding').length;
  await ui.tick();await new Promise(r=>setImmediate(r));
  assert.equal(c.calls.filter(x=>x.method==='Runtime.enable').length,count+1);
+ assert.equal(c.calls.filter(x=>x.method==='Runtime.addBinding').length,bindings+1);
  await ui.event(c,{method:'Runtime.bindingCalled',params:{name:ui.binding,executionContextId:7,payload:JSON.stringify({id:1,type:'metrics',input:{}})}});
  assert.equal(state.calls,1);assert.equal(connections.length,1);
  await ui.stop();
@@ -109,6 +111,20 @@ test('top-frame navigation revokes old contexts before the destroy event arrives
  await ui.event(c,{method:'Page.frameNavigated',params:{frame:{id:'main',url:'https://example.com/'}}});
  await ui.event(c,{method:'Runtime.bindingCalled',params:{name:ui.binding,executionContextId:7,payload:JSON.stringify({id:1,type:'metrics',input:{}})}});
  assert.equal(state.calls,0);assert.equal(c.contexts.size,0);await ui.stop();
+});
+
+test('bridge resynchronization releases abandoned calls without disabling the widget or reusing replies',async()=>{
+ const window={};window.top=window;const sent=[];
+ window.__agPulseRuntimeCallV4=payload=>sent.push(JSON.parse(payload));
+ const source=makeRendererSource('module.exports = function(){return {};};','module.exports = function(){};');
+ runInNewContext(source,{window,setTimeout,clearTimeout});
+ const abandoned=window.agPulseHost.getMetrics({conversationId:null});
+ window.__agPulseRuntimeBridge.reconnect();const unavailable=await abandoned;
+ assert.equal(unavailable.connection,'offline');assert.equal(unavailable.enabled,undefined);
+ const resumed=window.agPulseHost.getMetrics({conversationId:null});
+ window.__agPulseRuntimeBridge.resolve(sent[0].id,{connection:'stale',groups:[]});
+ window.__agPulseRuntimeBridge.resolve(sent[1].id,{connection:'live',groups:[]});
+ assert.equal((await resumed).connection,'live');window.__agPulseRuntimeBridge.dispose();
 });
 
 test('disable disposes UI, intervals and navigation hooks; reenable attaches once', async () => {

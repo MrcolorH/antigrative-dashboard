@@ -1,8 +1,9 @@
 # Changelog
 
-## 0.8.2 — 2026-10-12
+## 0.8.3 — 2026-10-12
 
 - Separate App RPC/application failures from endpoint loss. Missing historical trajectories, HTTP 4xx/5xx other than credential failures, and malformed responses no longer trigger process discovery. Coalesce concurrent discovery and back off failed cold starts from 3 seconds to a maximum of 30 seconds; transport/credential failures still recover automatically with bounded scans.
+- Restore the data binding subscription after Runtime domain resynchronization and release abandoned bridge requests without disabling the widget. The v0.8.2 candidate was blocked by CI before package publication; the completed fix ships in v0.8.3.
 - Track top-frame navigation and default execution contexts, including reversed event ordering. If hooks exist without a trusted main context, resynchronize Runtime events on the same socket. Navigation exceptions remove the failed session's preload before reconnecting. Keep remote/iframe contexts excluded.
 - Add local HTTP regressions for history errors, cold-start/auth cooldown and backend restarts, plus real Chromium/CDP delayed-composer and interrupted-navigation coverage. The reporting user's exact environment and failure remain unverified; these tests do not establish the cause of every cold-start failure.
 

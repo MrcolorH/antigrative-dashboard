@@ -109,6 +109,7 @@ function rendererBridge(binding) {
   window.__agPulseRuntimeBridge = {
     binding,
     resolve(id, result) { const item = pending.get(id); if (!item) return; clearTimeout(item.timer); pending.delete(id); item.resolve(result); },
+    reconnect() { for(const item of pending.values()){clearTimeout(item.timer);item.resolve({connection:'offline',error:'等待 Antigrative Dashboard 重新连接',speed:null,groups:[]});}pending.clear(); },
     dispose() { for (const item of pending.values()) { clearTimeout(item.timer); item.resolve(empty()); } pending.clear(); delete window.__agPulseRuntimeBridge; },
   };
   if (!window.agPulseHost) window.agPulseHost = {
@@ -249,6 +250,10 @@ export class RuntimeUi {
             const frame=await connection.command('Page.getFrameTree');connection.frameId=frame.frameTree?.frame?.id;
             connection.contextCandidates.clear();
             await connection.command('Runtime.disable');await connection.command('Runtime.enable');
+            // Runtime.disable also removes binding subscriptions. Restore the
+            // data channel and release old calls before normal polling resumes.
+            await connection.command('Runtime.addBinding',{name:this.binding});
+            await connection.command('Runtime.evaluate',{expression:this.rendererGuard('window.__agPulseRuntimeBridge?.reconnect?.();')});
           }
           const result = await connection.command('Runtime.evaluate', { returnByValue: true,
             expression: '({mounted:Boolean(document.getElementById("ag-pulse-status-bar")?.isConnected),installed:Boolean(window.__agPulseInlineInstalled),bridge:Boolean(window.__agPulseRuntimeBridge && window.agPulseHost'+(this.owner?' && window.__agPulseRuntimeBridge.binding==='+JSON.stringify(this.binding):'')+')})' });

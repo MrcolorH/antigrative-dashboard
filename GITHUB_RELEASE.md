@@ -1,4 +1,6 @@
-# Antigrative Dashboard v0.8.2
+# Antigrative Dashboard v0.8.3
+
+The v0.8.2 candidate was blocked by its startup/navigation regression before package publication. This release includes the completed data-channel recovery fix.
 
 ## Cold-start recovery
 
@@ -6,6 +8,7 @@
 - Coalesce concurrent discovery. Failed cold starts use a 3-second initial delay with exponential backoff capped at 30 seconds. Connection refusal/reset and credential failures still recover automatically, with a scan cooldown.
 - A late failure from an old endpoint cannot invalidate a newly discovered endpoint. Existing PID/port/credential pairing and loopback restrictions remain in place.
 - Track top-frame navigation and trusted default contexts, including context creation arriving before navigation. If hooks exist without a tracked main context, resynchronize Runtime events on the same socket.
+- Re-register data bindings after Runtime domain resynchronization and release abandoned requests without temporarily disabling the widget. Runtime.disable clears binding subscriptions; retaining the page function alone does not restore notifications. See the [V8 implementation](https://github.com/v8/v8/blob/main/src/inspector/v8-runtime-agent-impl.cc).
 - Reject prior contexts at navigation and remove a failed session's preload before reconnecting, so repeated navigation errors do not accumulate injection scripts.
 
 The renderer already waits for the DOM and observes composer creation; this release does not assume every loading delay is a renderer bug. Historical usage import remains enabled, with conversation errors isolated from connection recovery.
@@ -14,15 +17,15 @@ The renderer already waits for the DOM and observes composer creation; this rele
 
 - Local HTTP regressions cover unavailable history, malformed responses, concurrent discovery, cold-start/auth cooldown and backend port/PID restarts.
 - In the synthetic application-error scenario, process discovery drops from 39 scans to 1; this is a regression result, not a measurement of the reporting user's machine.
-- Real Chromium/CDP tests cover five rounds of delayed composer creation and interrupted startup navigation, recovering live metrics without disable/enable.
+- Real Chromium/CDP tests cover five rounds per CI run, plus a local 30-round stress run of delayed composer creation and interrupted startup navigation, recovering live metrics without disable/enable.
 - Protocol fixtures cover top-frame replacement, reversed event order, missing context events, and remote/iframe exclusion.
 - The remount hover regression moves the pointer away before restoring controls, isolating cancellation of the removed control's timer from a legitimate new pointer entry.
 - Publication requires Windows/Linux/macOS automated tests, package checks and official desktop resource checks. The reporting user's exact environment and original failure remain unverified; signed-in Linux/macOS GUI acceptance is still outstanding.
 
 ## Downloads and update
 
-- **Desktop App / CLI:** `antigrative-dashboard-0.8.2.zip` and `.zip.sha256`. Extract and use `python manage.py install` for App or `python manage.py install-cli` for CLI. Use python3 on Linux/macOS.
-- **Standalone Antigravity IDE:** `antigrative-dashboard-ide-0.8.2.vsix` and `.vsix.sha256`. Install from VSIX and retain the documented loopback debugging launch flags. Shared client/runtime fixes are included; these changes were not diagnosed as an IDE-specific report.
+- **Desktop App / CLI:** `antigrative-dashboard-0.8.3.zip` and `.zip.sha256`. Extract and use `python manage.py install` for App or `python manage.py install-cli` for CLI. Use python3 on Linux/macOS.
+- **Standalone Antigravity IDE:** `antigrative-dashboard-ide-0.8.3.vsix` and `.vsix.sha256`. Install from VSIX and retain the documented loopback debugging launch flags. Shared client/runtime fixes are included; these changes were not diagnosed as an IDE-specific report.
 
 After installing the App/IDE update, fully quit and reopen the host so its collector loads the new modules. No language preferences, historical statistics or usage-ledger data are cleared. CLI metrics and rendering are unchanged from v0.8.1. Other editor integrations remain unsupported.
 
