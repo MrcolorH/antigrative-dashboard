@@ -7,6 +7,7 @@ import {fileURLToPath,pathToFileURL} from 'node:url';
 import {createRequire} from 'node:module';
 import assert from 'node:assert/strict';
 import {PreferencesStore} from '../compat/preferences.mjs';
+import {panelAppSource} from '../sidecars/panel/panel-source.mjs';
 
 const root=join(dirname(fileURLToPath(import.meta.url)),'..');
 const read=path=>readFile(join(root,path),'utf8');
@@ -26,7 +27,8 @@ async function serve() {
         else text=JSON.stringify(await store.get());type='application/json';
       }else if(path==='/api/metrics'){
         text=JSON.stringify({connection:'live',serverTime:new Date().toISOString(),preferences:await store.snapshot(),groups:[],speed:{conversationId:id,counts:{},cache:null,context:null}});type='application/json';
-      }else if(path==='/i18n.js')text='export const createI18n='+extract(i18n);
+      }else if(path==='/app.js')text=panelAppSource();
+      else if(path==='/i18n.js')text='export const createI18n='+extract(i18n);
       else if(path==='/theme.js')text='export const createTheme='+extract(theme);
       else if(path==='/theme.css'){text=themeCss;type='text/css';}
       else if(path==='/inline-widget.js')text=`window.__agPulseI18nFactory=(${extract(i18n)});window.__agPulseThemeFactory=(${extract(theme)});(${extract(widget)})();`;

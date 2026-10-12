@@ -4,10 +4,10 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Antigrative Dashboard</title>
-  <link rel="stylesheet" href="/theme.css">
-  <link rel="stylesheet" href="/styles.css">
+  <link rel="stylesheet" href="/theme.css?v=sidebar-layout-3">
+  <link rel="stylesheet" href="/styles.css?v=sidebar-layout-3">
   <script src="/preload.js"></script>
-  <script type="module" src="/app.js"></script>
+  <script defer src="/app.js?v=sidebar-layout-3"></script>
 </head>
 <body>
   <svg class="icon-definitions" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
@@ -27,9 +27,27 @@
         <button class="icon-button" id="refresh-button" type="button" data-i18n-aria="refreshStats" aria-label="Refresh statistics" title="Refresh statistics"><svg class="icon"><use href="#refresh"/></svg></button>
       </div>
     </header>
-    <section class="card-stage" data-i18n-aria="session" aria-label="Statistics">
-      <div class="rest-state"><span id="rest-title">Connecting to Antigravity…</span><span id="rest-subtitle">Hover over the strip for details</span></div>
-      <article class="detail-card" id="speed-card" role="region" data-i18n-aria="session" aria-label="Session statistics" hidden>
+    <p class="sampled-model"><span data-i18n="contextModel">Sampled model</span><span id="strip-model">—</span></p>
+    <nav class="status-strip" role="tablist" data-i18n-aria="panelDetails" aria-label="Metric details">
+      <button class="metric-chip" id="speed-tab" type="button" role="tab" data-card="speed" aria-controls="speed-card" aria-selected="true" tabindex="0">
+        <span class="metric-label"><svg class="icon"><use href="#gauge"/></svg><span data-i18n="panelSpeed">Speed</span></span>
+        <span class="chip-primary"><strong id="strip-tps">—</strong><span class="unit">tok/s</span></span><span class="chip-secondary" id="session-steps">—</span>
+      </button>
+      <button class="metric-chip" id="cache-tab" type="button" role="tab" data-card="cache" aria-controls="cache-card" aria-selected="false" tabindex="-1">
+        <span class="metric-label"><svg class="icon"><use href="#cache"/></svg><span data-i18n="panelCache">Cache</span></span>
+        <span class="chip-primary"><strong id="strip-cache">—</strong></span><span class="chip-secondary" id="strip-cache-total">— tok</span>
+      </button>
+      <button class="metric-chip" id="context-tab" type="button" role="tab" data-card="context" aria-controls="context-card" aria-selected="false" tabindex="-1">
+        <span class="metric-label"><svg class="icon"><use href="#gauge"/></svg><span data-i18n="panelContext">Context</span></span>
+        <span class="chip-primary"><strong id="strip-context">—</strong><span class="unit" data-i18n="panelUsed">used</span></span><span class="chip-secondary" id="strip-context-size">—</span>
+      </button>
+    </nav>
+    <section class="quota-overview" data-i18n-aria="panelSharedQuota" aria-label="Shared quota">
+      <div class="quota-mini"><div><span>5h</span><strong id="five-summary-balance">—</strong></div><div class="quota-track"><i id="five-summary-fill"></i></div><p><span data-i18n="resetIn">Resets in</span><span id="five-summary-countdown">—</span></p></div>
+      <div class="quota-mini"><div><span data-i18n="weekShort">Wk</span><strong id="week-summary-balance">—</strong></div><div class="quota-track"><i id="week-summary-fill"></i></div><p><span data-i18n="resetIn">Resets in</span><span id="week-summary-countdown">—</span></p></div>
+    </section>
+    <section class="card-stage" data-i18n-aria="panelDetails" aria-label="Metric details">
+      <article class="detail-card" id="speed-card" role="tabpanel" tabindex="0" aria-labelledby="speed-tab">
         <div class="card-heading"><span><svg class="icon"><use href="#gauge"/></svg><span data-i18n="session">Session statistics</span></span><span class="card-tag" id="request-count">— samples</span></div>
         <dl>
           <div><dt><span data-i18n="modelTime">Model time</span></dt><dd id="model-time">—</dd></div>
@@ -41,11 +59,11 @@
         </dl>
         <p class="card-footnote" id="speed-basis">Response tokens ÷ streaming duration; session rate is time-weighted.</p>
       </article>
-      <article class="detail-card" id="cache-card" role="region" data-i18n-aria="cacheTitle" aria-label="Token cache" hidden>
+      <article class="detail-card" id="cache-card" role="tabpanel" tabindex="0" aria-labelledby="cache-tab" hidden>
         <div class="card-heading"><span><svg class="icon"><use href="#cache"/></svg><span data-i18n="cacheTitle">Token cache</span></span><span class="card-tag" id="cache-coverage">—</span></div>
         <dl><div><dt data-i18n="cacheRate">Cache hit</dt><dd id="cache-rate">—</dd></div><div><dt data-i18n="cacheMiss">Uncached input</dt><dd id="cache-miss">—</dd></div><div><dt data-i18n="cacheRead">Cache read</dt><dd id="cache-read">—</dd></div><div><dt data-i18n="cacheOutput">Output</dt><dd id="cache-output">—</dd></div><div id="cache-write-row" hidden><dt data-i18n="cacheWrite">Cache write</dt><dd id="cache-write">—</dd></div></dl><p class="card-footnote" id="cache-note">Cached input divided by total input.</p>
       </article>
-      <article class="detail-card" id="context-card" role="region" data-i18n-aria="context" hidden>
+      <article class="detail-card" id="context-card" role="tabpanel" tabindex="0" aria-labelledby="context-tab" hidden>
         <div class="card-heading"><span data-i18n="context">Context window</span></div>
         <strong id="context-summary">—</strong><p id="context-tokens">—</p>
         <div class="quota-track" role="progressbar" data-i18n-aria="context" id="context-track"><i id="context-fill"></i></div>
@@ -68,13 +86,6 @@
         </div>
       </article>
     </section>
-    <footer class="status-strip" data-i18n-aria="strip" aria-label="Live statistics">
-      <button class="metric-chip speed-chip" type="button" data-card="speed" aria-controls="speed-card" aria-expanded="false">
-        <svg class="icon"><use href="#gauge"/></svg><span class="chip-content"><span class="chip-primary"><span class="session-rounds" id="session-steps">—</span><strong id="strip-tps">—</strong><span class="unit">tok/s</span></span><span class="chip-secondary" id="strip-model"><span data-i18n="session">Session statistics</span></span></span>
-      </button>
-      <button class="metric-chip" type="button" data-card="cache" aria-controls="cache-card" aria-expanded="false"><svg class="icon"><use href="#cache"/></svg><span class="chip-content"><span class="chip-primary"><span id="strip-cache-total">— tok</span></span><span class="chip-secondary"><span data-i18n="cache">Cache hit</span> <strong id="strip-cache">—</strong></span></span></button>
-      <button class="metric-chip" type="button" data-card="context" aria-controls="context-card" aria-expanded="false"><svg class="icon"><use href="#gauge"/></svg><span class="chip-content"><span class="chip-primary"><span data-i18n="contextShort">Ctx</span> <strong id="strip-context">—</strong></span><span class="chip-secondary" data-i18n="context">Context window</span></span></button>
-    </footer>
     <p class="health-note" id="health-note" role="status">Waiting for the first update</p>
     <p class="health-note" id="integration-note" role="status"></p>
   </main>

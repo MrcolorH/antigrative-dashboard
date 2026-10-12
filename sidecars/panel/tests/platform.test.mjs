@@ -53,11 +53,17 @@ test('macOS logs use Library/Logs with profile fallback; explicit log overrides 
   for(const platform of ['win32','darwin','linux']){
     const overridden=platformPaths({platform,home,env:{AG_PULSE_LOG:'/chosen.log'}});
     assert.equal(overridden.log,'/chosen.log');assert.deepEqual(overridden.logCandidates,['/chosen.log']);
-    if(platform!=='darwin'){
+    if(platform==='linux'){
       const defaults=platformPaths({platform,home,env:{}});
       assert.deepEqual(defaults.logCandidates,[defaults.log]);
     }
   }
+});
+
+test('Windows tries the native .gemini log while retaining profile and explicit overrides',()=>{
+ const p=platformPaths({platform:'win32',home:'/test-user',env:{APPDATA:'/roaming'}});
+ assert.deepEqual(p.logCandidates.map(x=>x.replaceAll('\\','/')),['/roaming/Antigravity/logs/language_server.log','/test-user/.gemini/antigravity/logs/language_server.log']);
+ assert.deepEqual(platformPaths({platform:'win32',home:'/test-user',env:{AG_PULSE_LOG:'/explicit'}}).logCandidates,['/explicit']);
 });
 
 test('discovery falls back from missing/stale logs and clears old server on failure',async()=>{
@@ -120,4 +126,35 @@ test('Windows discovers standalone candidates first and takes one hidden socket 
   let count=0;
   assert.deepEqual(await discoverProcesses({platform:'win32',run:async()=>{count++;return {stdout:'null'};}}),[]);
   assert.equal(count,1);
+});
+
+test('Windows missing netstat listeners use one bounded PID-filtered PowerShell fallback',async()=>{
+ for(const failNetstat of [false,true]){
+  const calls=[];
+  const rows=await discoverProcesses({platform:'win32',run:async(file,args,options)=>{
+   calls.push({file,args,options});
+   if(file==='netstat.exe'){if(failNetstat)throw Error('socket table unavailable');return {stdout:''};}
+   if(args.at(-1).includes('Get-CimInstance'))return {stdout:JSON.stringify([{ProcessId:12,CommandLine:'ls --standalone'},{ProcessId:112,CommandLine:'ls --standalone'}])};
+   return {stdout:JSON.stringify([{OwningProcess:12,LocalPort:1234},{OwningProcess:112,LocalPort:4321},{OwningProcess:99,LocalPort:9999},{OwningProcess:12,LocalPort:0}])};
+  }});
+  assert.deepEqual(rows.map(r=>r.Ports),[[1234],[4321]]);
+  assert.equal(calls.length,3);assert.ok(calls[2].args.at(-1).includes('Get-NetTCPConnection'));
+  assert.ok(calls.every(c=>c.options.windowsHide));assert.ok(calls[2].options.timeout<=8000);
+ }
+});
+
+test('localized netstat listener state keeps PID ownership and excludes established sockets',()=>{
+ const ports=parseNetstat(' TCP [::]:1234 [::]:0 侦听 12\n TCP 127.0.0.1:4321 0.0.0.0:0 监听 12\n TCP 127.0.0.1:5555 127.0.0.1:6666 ESTABLISHED 12');
+ assert.deepEqual(ports.get(12),[1234,4321]);
+});
+
+test('failed or foreign-PID fallback cannot turn a stale log into a usable endpoint',async()=>{
+ const calls=[];
+ const rows=await discoverProcesses({platform:'win32',run:async(file,args)=>{
+  calls.push(file);
+  if(file==='netstat.exe')return {stdout:''};
+  return {stdout:args.at(-1).includes('Get-CimInstance')?'[{"ProcessId":12,"CommandLine":"ls --standalone --csrf_token=fixture"}]':'[{"OwningProcess":99,"LocalPort":1234}]'};
+ }});
+ assert.equal(calls.length,3);assert.deepEqual(rows[0].Ports,[]);
+ assert.throws(()=>serverFromDiscovery('listening on random port at 1234 for HTTP\n',rows),/接口启动/);
 });

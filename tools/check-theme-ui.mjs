@@ -6,6 +6,7 @@ import { pathToFileURL, fileURLToPath } from 'node:url';
 import { createRequire } from 'node:module';
 import assert from 'node:assert/strict';
 import { trajectoryMetrics } from '../sidecars/panel/metrics.mjs';
+import { panelAppSource } from '../sidecars/panel/panel-source.mjs';
 
 const root=resolve(dirname(fileURLToPath(import.meta.url)),'..');
 const read=path=>readFile(join(root,path),'utf8');
@@ -26,6 +27,7 @@ const server=createServer(async(req,res)=>{
       content=JSON.stringify(previewPreferences);type='application/json';
     }
     else if(path==='/api/metrics'){content=JSON.stringify(sample());type='application/json';}
+    else if(path==='/app.js')content=panelAppSource();
     else if(path==='/i18n.js')content='export const createI18n='+extract(i18n);
     else if(path==='/theme.js')content='export const createTheme='+extract(themeSource);
     else if(path==='/theme.css'){content=theme.css(':root');type='text/css';}
@@ -340,7 +342,7 @@ try {
     await page.evaluate(mode=>document.documentElement.style.setProperty('--background',mode==='dark'?'color(srgb 0.07 0.07 0.07)':'oklch(98% 0.01 250)'),mode);
     await page.waitForFunction(mode=>document.documentElement.dataset.pulseTheme===mode,mode);
     for(const card of ['speed','cache','context']) {
-      await page.locator(`[data-card=${card}]`).hover();await page.locator(`#${card}-card`).waitFor({state:'visible'});
+      await page.locator(`[data-card=${card}]`).click();await page.locator(`#${card}-card`).waitFor({state:'visible'});
       assert.equal(await page.locator(`#${card}-card`).evaluate(e=>getComputedStyle(e).color),mode==='light'?'rgb(32, 38, 49)':'rgb(225, 227, 231)');
     }
     await page.screenshot({path:join(output,`${mode}-panel.png`)});

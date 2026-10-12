@@ -38,7 +38,7 @@ export function parseProcNet(text) {
 export function parseNetstat(text) {
   const ports=new Map();
   for(const line of text.split(/\r?\n/)) {
-    const match=line.match(/^\s*TCP\s+(\S+)\s+\S+\s+LISTENING\s+(\d+)\s*$/i);
+    const match=line.match(/^\s*TCP\s+(\S+)\s+\S+\s+(?:LISTENING|LISTEN|侦听|监听)\s+(\d+)\s*$/i);
     if(!match)continue;
     const port=Number(match[1].match(/:(\d+)$/)?.[1]),pid=Number(match[2]);
     if(!Number.isInteger(port)||port<1||port>65535||!Number.isSafeInteger(pid)||pid<1)continue;
@@ -69,8 +69,23 @@ export async function discoverProcesses({ platform = process.platform, run = exe
     if(!rows.length)return [];
     // One native socket-table snapshot for all candidates, rather than a costly
     // Get-NetTCPConnection/CIM query for every language_server.exe process.
-    const {stdout:sockets}=await run('netstat.exe',['-ano','-p','tcp'],{windowsHide:true,timeout:4000,maxBuffer:4194304});
+    const {stdout:sockets}=await run('netstat.exe',['-ano','-p','tcp'],{windowsHide:true,timeout:4000,maxBuffer:4194304}).catch(()=>({stdout:''}));
     const ports=parseNetstat(sockets);
+    const missing=rows.filter(row=>!ports.get(row.ProcessId)?.length).map(row=>row.ProcessId);
+    if(missing.length){
+      // One asynchronous fallback for all missing candidates, never a shell
+      // per process or an unverified log-only port paired with a credential.
+      const script=`$pulsePids = @(${missing.join(',')}); Get-NetTCPConnection -State Listen -ErrorAction Stop | Where-Object { $pulsePids -contains $_.OwningProcess } | Select-Object OwningProcess,LocalPort | ConvertTo-Json -Compress`;
+      try{
+        const {stdout}=await run('powershell.exe',['-NoProfile','-NonInteractive','-Command',script],{windowsHide:true,timeout:8000,maxBuffer:1048576});
+        const value=stdout.trim()?JSON.parse(stdout.replace(/^\uFEFF/,'')):[];
+        for(const item of Array.isArray(value)?value:[value]){
+          const pid=Number(item?.OwningProcess),port=Number(item?.LocalPort);
+          if(!missing.includes(pid)||!Number.isInteger(port)||port<1||port>65535)continue;
+          if(!ports.has(pid))ports.set(pid,[]);if(!ports.get(pid).includes(port))ports.get(pid).push(port);
+        }
+      }catch{ /* Keep discovery waiting safely if both socket sources fail. */ }
+    }
     return rows.map(row=>({...row,Ports:ports.get(row.ProcessId)||[]}));
   }
   if (platform === 'darwin') {

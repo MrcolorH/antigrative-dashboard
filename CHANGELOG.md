@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.8.4 — 2026-10-13
+
+- Redesign the App side panel as a persistent dashboard: three metric cards also select detail tabs, compact quota summaries stay visible, the default speed details remain open, and long details scroll within a fixed frame. Pointer departure no longer hides selected information; arrow/Home/End keyboard selection is supported. Shared metrics, preference storage and theme adaptation are retained.
+- Version panel scripts and styles together from a content hash and serve uncached resources; align the hosted iframe background with its derived theme despite the SDK's inline body background. Prevent mixing new HTML with cached older code/styles during plugin updates.
+
+- Address [#11](https://github.com/YOU-SHOULD-KNOW-ME/antigrative-dashboard/issues/11): serve the sidecar panel as a self-contained classic script instead of loading ESM dependencies from plugin://. Defer the entry script, wait for DOM readiness, guard missing widgets and prevent duplicate initialization. Both the SDK and standalone preview use the same bundle generator.
+- Add one asynchronous, hidden and time-bounded PID-filtered Get-NetTCPConnection fallback when Windows netstat has no listener for a candidate or fails. Recognize localized listening states and try the Windows .gemini log location as a fallback, retaining process/port ownership validation and explicit log overrides.
+- Add Chromium checks for ordinary and early classic-script loading, opaque sandboxed iframe execution, metrics/cache/context/quota display, language/manual refresh, automatic recovery and duplicate scripts. Windows signed-in plugin:// verification reproduces the old uninitialized module panel and confirms the restarted classic/deferred panel, matching inline metrics, language switching and manual refresh. The reporting user's machine remains a separate acceptance scope.
+
 ## 0.8.3 — 2026-10-12
 
 - Separate App RPC/application failures from endpoint loss. Missing historical trajectories, HTTP 4xx/5xx other than credential failures, and malformed responses no longer trigger process discovery. Coalesce concurrent discovery and back off failed cold starts from 3 seconds to a maximum of 30 seconds; transport/credential failures still recover automatically with bounded scans.

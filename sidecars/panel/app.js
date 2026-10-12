@@ -1,6 +1,9 @@
 import { percent, rate, count, elapsed, countdown, resetDate } from './format.mjs';
 import { createI18n } from './i18n.js';
 import { createTheme } from './theme.js';
+function initPanel(){
+if(!document.querySelector('.widget')||window.__agPulsePanelInstalled)return;
+window.__agPulsePanelInstalled=true;
 const theme=createTheme();
 let themeController=theme.attach(document.documentElement);
 window.addEventListener('pagehide',()=>themeController.dispose());
@@ -14,7 +17,8 @@ const $ = id => document.getElementById(id);
 const compact=n=>typeof n!=='number'||!Number.isFinite(n)?'—':n>=1e9?`${(n/1e9).toFixed(1).replace(/\.0$/,'')}B`:n>=1e6?`${(n/1e6).toFixed(1).replace(/\.0$/,'')}M`:n>=1e3?`${(n/1e3).toFixed(1).replace(/\.0$/,'')}K`:String(n);
 const chips = [...document.querySelectorAll('[data-card]')];
 let snapshot = null, selectedGroup = localGet('ag-pulse-group'), group = null;
-let pending = false, timer = null, leaveTimer = null, serverOffset = 0, lastExpiredRefresh = 0;
+let pending = false, timer = null, serverOffset = 0, lastExpiredRefresh = 0;
+let selectedCard='speed',cardMotion=null;
 let refreshRequest=null,manualRequest=null;
 const host = window.sidecar;
 if (!host) document.body.classList.add('standalone');
@@ -27,21 +31,22 @@ const connectPreferences=()=>language.connectPreferences({read:()=>preferenceReq
   cache:value=>localSet('ag-pulse-language',value),changed:()=>{localize();render();updateCountdowns();}});
 let preferences=connectPreferences();
 
-function showCard(name) {
-  clearTimeout(leaveTimer);
-  for (const chip of chips) chip.setAttribute('aria-expanded', String(chip.dataset.card === name));
+function showCard(name,animate=false) {
+  if(!['speed','cache','context'].includes(name))return;
+  const changed=selectedCard!==name;selectedCard=name;
+  cardMotion?.cancel();cardMotion=null;
+  for (const chip of chips){const selected=chip.dataset.card===name;chip.setAttribute('aria-selected',String(selected));chip.tabIndex=selected?0:-1;}
   for (const nameKey of ['speed','cache','context']) $(`${nameKey}-card`).hidden = name !== nameKey;
-  document.querySelector('.rest-state').style.visibility = name ? 'hidden' : '';
+  if(changed&&animate&&!matchMedia('(prefers-reduced-motion: reduce)').matches)cardMotion=$(`${name}-card`).animate([{opacity:.6,transform:'translateY(4px)'},{opacity:1,transform:'translateY(0)'}],{duration:160,easing:'cubic-bezier(.23,1,.32,1)'});
 }
 for (const chip of chips) {
-  chip.addEventListener('mouseenter', () => showCard(chip.dataset.card));
-  chip.addEventListener('focus', () => showCard(chip.dataset.card));
-  chip.addEventListener('click', () => showCard(chip.dataset.card));
+  chip.addEventListener('click', event => showCard(chip.dataset.card,event.detail>0));
+  chip.addEventListener('keydown',event=>{
+    const current=chips.indexOf(chip);let next;
+    if(event.key==='ArrowRight')next=(current+1)%chips.length;else if(event.key==='ArrowLeft')next=(current+chips.length-1)%chips.length;else if(event.key==='Home')next=0;else if(event.key==='End')next=chips.length-1;else return;
+    event.preventDefault();showCard(chips[next].dataset.card);chips[next].focus();
+  });
 }
-const widget = document.querySelector('.widget');
-widget.addEventListener('mouseleave', () => { leaveTimer = setTimeout(() => { if (!widget.contains(document.activeElement)) showCard(null); }, 100); });
-widget.addEventListener('focusout', () => { setTimeout(() => { if (!widget.contains(document.activeElement) && !widget.matches(':hover')) showCard(null); }, 0); });
-document.addEventListener('keydown', event => { if (event.key === 'Escape') { showCard(null); document.activeElement?.blur(); } });
 function localize(){
   document.documentElement.lang=language.language;
   for(const e of document.querySelectorAll('[data-i18n]'))e.textContent=t(e.dataset.i18n);
@@ -86,11 +91,13 @@ function render() {
   for (const element of document.querySelectorAll('.group-name')) element.textContent = group ? groupLabel(group) : '—';
   renderQuota('5h','five'); renderQuota('weekly','week');
   $('strip-tps').textContent = rate(speed?.tps);
+  $('speed-tab').title=rate(speed?.tps)+' tok/s';
   $('session-tps').textContent = rate(speed?.tps);
   $('latest-tps').textContent = speed?.latestRateStatus==='unreliable'?t('timingUnreliable'):speed?.latestRateStatus==='legacy'?t('ratePending'):rate(speed?.latestTps);
   $('request-count').textContent = t('sampleCount',{n:speed?.measuredRequests??0});
   $('session-steps').textContent = speed ? t('rounds',{rounds:speed.rounds,steps:speed.steps}) : '';
   $('strip-model').textContent = speed?.model || t('waitingRequest');
+  $('strip-model').title=$('strip-model').textContent;
   $('model-time').textContent = language.elapsed(speed?.modelSeconds);
   $('tool-time').textContent = language.elapsed(speed?.toolSeconds);
   $('ttft').textContent = language.elapsed(speed?.ttftSeconds);
@@ -101,6 +108,8 @@ function render() {
   const cache=speed?.cache;
   const context=speed?.context,hasCapacity=typeof context?.usedFraction==='number';
   $('strip-context').textContent=hasCapacity?`${Math.round(context.usedFraction*100)}%`:'—';
+  $('strip-context-size').textContent=context?`${compact(context.usedTokens)} / ${context.maxTokens===null?'—':compact(context.maxTokens)}`:'—';
+  $('context-tab').title=context?t('contextTokens',{used:count(context.usedTokens),max:context.maxTokens===null?'—':count(context.maxTokens)}):t('contextUnknown');
   $('context-summary').textContent=hasCapacity?t('contextUsed',{used:Math.round(context.usedFraction*100),remaining:Math.round(context.remainingFraction*100)}):t('contextUnknown');
   $('context-tokens').textContent=context?t('contextTokens',{used:compact(context.usedTokens),max:context.maxTokens===null?'—':compact(context.maxTokens)}):'—';
   $('context-model').textContent=context?.model||'—';
@@ -111,14 +120,13 @@ function render() {
   if(hasCapacity){$('context-track').setAttribute('aria-valuenow',String(Math.min(100,context.usedFraction*100)));$('context-track').setAttribute('aria-valuemin','0');$('context-track').setAttribute('aria-valuemax','100');}else $('context-track').removeAttribute('aria-valuenow');
   $('strip-cache').textContent=percent(cache?.hitRate);$('cache-rate').textContent=percent(cache?.hitRate);
   $('strip-cache-total').textContent=cache?.measuredRequests?`${compact(cache.totalTokens)} tok`:'— tok';
+  $('cache-tab').title=percent(cache?.hitRate)+' · '+(cache?.measuredRequests?count(cache.totalTokens)+' tok':'—');
   for(const [field,id]of[['cachedTokens','cache-read'],['uncachedTokens','cache-miss'],['cacheWriteTokens','cache-write'],['outputTokens','cache-output']])$(id).textContent=cache?.measuredRequests?`${count(cache[field])} tok`:'—';
   $('cache-coverage').textContent=cache?.measuredRequests?`${count(cache.totalTokens)} tok`:'— tok';
   $('cache-write-row').hidden=!(cache?.cacheWriteTokens>0);
   $('cache-note').textContent=(cache?.measuredRequests?t('cacheBasis')+(cache.missingRequests?' '+t('cacheMissing',{n:cache.missingRequests}):''):t('cacheUnavailable'))+savedNote+saveWarning;
   $('connection-dot').className = `connection-dot ${snapshot.connection}`;
   $('connection-dot').title = t(snapshot.connection === 'live'?'live':snapshot.connection === 'stale'?'stale':'offline');
-  $('rest-title').textContent = snapshot.connection === 'offline' ? t('waitingApp') : speed ? `${rate(speed.tps)} tok/s` : t('waitingModel');
-  $('rest-subtitle').textContent = t(snapshot.connection === 'offline'?'autoConnect':'hover');
   const timestamp = snapshot.quotaUpdatedAt ? new Date(snapshot.quotaUpdatedAt).toLocaleTimeString(language.language,{hour12:false}) : null;
   $('health-note').textContent = language.errorMessage(snapshot.error||snapshot.sessionError) || (timestamp ? t('health',{time:timestamp}) : t('firstUpdate'));
   $('health-note').classList.toggle('warning', snapshot.connection !== 'live' || !!snapshot.sessionError);
@@ -133,6 +141,9 @@ function updateCountdowns() {
   for (const [window,prefix] of [['5h','five'],['weekly','week']]) {
     const bucket = group?.windows?.[window];
     $(`${prefix}-countdown`).textContent = language.countdown(bucket?.resetAt,now);
+    $(`${prefix}-summary-countdown`).textContent=language.countdown(bucket?.resetAt,now,true);
+    $(`${prefix}-summary-balance`).textContent=percent(bucket?.remaining);
+    $(`${prefix}-summary-fill`).style.width=typeof bucket?.remaining==='number'?`${Math.min(100,Math.max(0,bucket.remaining*100))}%`:'0%';
     if (bucket?.resetAt && Date.parse(bucket.resetAt) <= now && snapshot?.connection === 'live' && now - lastExpiredRefresh > 30000) {
       lastExpiredRefresh = now; setTimeout(() => refresh(true),0);
     }
@@ -176,7 +187,7 @@ function refresh(force = false) {
     render();
   } catch (error) {
     if (snapshot) { snapshot.connection = 'stale'; snapshot.error = error.message; render(); }
-    else { $('rest-title').textContent = t('connecting'); $('health-note').textContent = language.errorMessage(error.message); $('health-note').classList.add('warning'); }
+    else { $('health-note').textContent = language.errorMessage(error.message); $('health-note').classList.add('warning'); }
   } finally {
     pending = false; refreshRequest=null;
     clearTimeout(timer); timer = setTimeout(refresh, document.hidden ? 10000 : 2200);
@@ -192,4 +203,8 @@ window.addEventListener('pagehide',()=>preferences.dispose());
 window.addEventListener('pageshow',event=>{if(event.persisted)preferences=connectPreferences();});
 setInterval(updateCountdowns,1000);
 localize();
+showCard('speed');
 refresh();
+}
+if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',initPanel,{once:true});
+else initPanel();

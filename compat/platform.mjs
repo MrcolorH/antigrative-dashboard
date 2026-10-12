@@ -21,7 +21,7 @@ export function platformPaths({ platform = process.platform, home = homedir(), e
   const profileLog=join(profile,'logs','language_server.log');
   const log=env.AG_PULSE_LOG || (platform==='darwin'?join(home,'Library','Logs','Antigravity','language_server.log'):profileLog);
   return {
-    profile, log, logCandidates:env.AG_PULSE_LOG?[log]:[...new Set([log,profileLog])],
+    profile, log, logCandidates:env.AG_PULSE_LOG?[log]:[...new Set([log,profileLog,...(platform==='win32'?[join(home,'.gemini','antigravity','logs','language_server.log')]:[])])],
     settings,
     pluginConfig: join(home, '.gemini', 'config', 'config.json'),
     data: env.ANTIGRAVITY_EXECUTABLE_DATA_DIR || join(home, '.gemini', 'antigravity', 'sidecar_data', 'antigravity-pulse', 'panel', 'data'),

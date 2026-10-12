@@ -33,6 +33,7 @@ jobs:
       - run: npm run test:ui
       - run: node tools/check-ide-ui.mjs
       - run: npm run test:usage-ui
+      - run: npm run test:panel-ui
       - run: python manage.py package
       - run: python ide/package.py
   release:

@@ -7,7 +7,7 @@
 模型选择旁只显示生成速率、缓存和上下文占用；悬停上下文，一并查看上下文、5 小时和周额度详情。<br>
 缩略信息常驻；鼠标悬停，才展开详细统计。
 
-[![Version 0.8.3](https://img.shields.io/badge/version-0.8.3-91adff?style=flat-square&labelColor=252936)](CHANGELOG.md)
+[![Version 0.8.4](https://img.shields.io/badge/version-0.8.4-91adff?style=flat-square&labelColor=252936)](CHANGELOG.md)
 [![Platforms](https://img.shields.io/badge/host-Windows%20%7C%20Linux%20%7C%20macOS-83d8b9?style=flat-square&labelColor=252936)](COMPATIBILITY.md)
 [![Antigravity 2.21.1 / 2.22.0](https://img.shields.io/badge/Antigravity-2.21.1%20%2F%202.22.0-c5a0ff?style=flat-square&labelColor=252936)](COMPATIBILITY.md)
 [![MIT](https://img.shields.io/badge/license-MIT-d4d9e6?style=flat-square&labelColor=252936)](LICENSE)
@@ -16,7 +16,7 @@
 
 </div>
 
-**v0.8.3 更新：** 加强冷启动恢复：历史／接口错误不再误触发后台重扫；限制重复进程扫描；初始页面跳转后重新同步 CDP 上下文。[完整更新说明](https://github.com/YOU-SHOULD-KNOW-ME/antigrative-dashboard/releases/tag/v0.8.3)。
+**v0.8.4 更新：** 修复 [#11](https://github.com/YOU-SHOULD-KNOW-ME/antigrative-dashboard/issues/11) 的 Windows 端口发现与侧栏卡死问题；侧栏改为常驻仪表盘，关键数据和额度持续显示，详情区尺寸稳定，脚本和样式同步换版本。[完整更新说明](https://github.com/YOU-SHOULD-KNOW-ME/antigrative-dashboard/releases/tag/v0.8.4)。
 
 ## 看看效果
 
@@ -64,7 +64,7 @@
 ## Antigravity IDE
 
 **v0.7.0** 新增反重力自己的独立 IDE 适配。下载发布页的
-`antigrative-dashboard-ide-0.8.3.vsix`，在 IDE 扩展页选择「从 VSIX 安装」。
+`antigrative-dashboard-ide-0.8.4.vsix`，在 IDE 扩展页选择「从 VSIX 安装」。
 仅安装 IDE 的用户也可以使用，无需先装桌面 App。
 
 完全退出 IDE 后，使用带
@@ -143,6 +143,12 @@ python manage.py install
 </details>
 
 ## 可插拔
+
+### 打开 App 侧边栏面板
+
+用右上角开关展开右侧辅助栏，在辅助栏顶部点击 **＋ → Extensions → Antigrative Dashboard**，即可打开插件的常驻仪表盘。速度、缓存、上下文和额度摘要持续显示；点击数据卡切换详情，鼠标移开不再隐藏。长内容在固定详情区内部滚动，也可用方向键／Home／End 选择标签页。输入框控件中打开的「用量统计」是另一个窗口。
+
+更新插件代码后请完整退出并重新打开 App，让采集进程加载新模块；重启前已经打开的面板可能仍由旧采集进程提供页面。
 
 在项目目录运行：
 
