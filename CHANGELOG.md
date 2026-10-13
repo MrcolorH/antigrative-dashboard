@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.8.5 — 2026-10-13
+
+- Replace whole-trajectory polling with independent offset reads for steps and generator metadata (`includeMessages: false`), using summaries, cached immutable prefixes and revalidated mutable tails. Incrementally validate/project returned JSON without retaining prompts, attachments or tool output. Preserve tool-only classification rather than substituting reduced verbosity that loses tool-call markers.
+- Remove the provisional 512 MiB whole-response cap for statistical streams. Use an 8 MiB projected-statistics/cache budget, bounded parsing and timeouts; ordinary/error responses remain separately bounded. Local synthetic 0/40/640 MiB and 1K/8K/16K/32K-record experiments underpin the budget and document its limits in [long-conversation collection](docs/LONG_CONVERSATIONS.md).
+- Preserve offsets, request deduplication, usage identities and rate/cache/context values; invalidate caches on rewinds, settled edits, account/endpoint changes and manual refresh. Periodically recheck idle tails; failed pages cannot replace complete cached revisions. Real Windows metadata/usage parity and synthetic large-page regressions pass; the reporting user's exact conversation remains untested.
+
 ## 0.8.4 — 2026-10-13
 
 - Redesign the App side panel as a persistent dashboard: three metric cards also select detail tabs, compact quota summaries stay visible, the default speed details remain open, and long details scroll within a fixed frame. Pointer departure no longer hides selected information; arrow/Home/End keyboard selection is supported. Shared metrics, preference storage and theme adaptation are retained.

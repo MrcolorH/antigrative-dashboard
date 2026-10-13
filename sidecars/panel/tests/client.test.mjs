@@ -26,6 +26,12 @@ test('unavailable history and malformed RPC replies never invalidate a healthy e
  assert.ok(client.server);
 });
 
+test('ordinary RPC JSON errors never expose a private response fragment',async t=>{
+ const {client,state}=await fixture(t);state.status=200;state.body='{"private":"DO_NOT_DISCLOSE" invalid}';
+ await assert.rejects(client.call('GetUserStatus'),error=>error.message==='Antigravity 接口返回了无法解析的数据');
+ state.body='{}';assert.deepEqual(await client.call('GetUserStatus'),{});assert.equal(state.scans,1);
+});
+
 test('cold-start discovery failures coalesce and back off while the backend starts',async()=>{
  let now=0,scans=0,ready=false;
  const client=new AntigravityClient({now:()=>now,paths:()=>({log:'fixture'}),readLog:async()=> 'listening on random port at 1234 for HTTP\n',

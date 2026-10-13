@@ -7,7 +7,7 @@
 Token throughput, cache hits and context usage in the model selector row. Hover over context for five-hour and weekly quotas too.<br>
 Keep the summary visible. Hover for the details.
 
-[![Version 0.8.4](https://img.shields.io/badge/version-0.8.4-91adff?style=flat-square&labelColor=252936)](CHANGELOG.md)
+[![Version 0.8.5](https://img.shields.io/badge/version-0.8.5-91adff?style=flat-square&labelColor=252936)](CHANGELOG.md)
 [![Platforms](https://img.shields.io/badge/host-Windows%20%7C%20Linux%20%7C%20macOS-83d8b9?style=flat-square&labelColor=252936)](COMPATIBILITY.md)
 [![Antigravity 2.21.1 / 2.22.0](https://img.shields.io/badge/Antigravity-2.21.1%20%2F%202.22.0-c5a0ff?style=flat-square&labelColor=252936)](COMPATIBILITY.md)
 [![MIT](https://img.shields.io/badge/license-MIT-d4d9e6?style=flat-square&labelColor=252936)](LICENSE)
@@ -16,7 +16,7 @@ Keep the summary visible. Hover for the details.
 
 </div>
 
-**v0.8.4:** Fix Windows discovery and frozen sidecar panels for [#11](https://github.com/YOU-SHOULD-KNOW-ME/antigrative-dashboard/issues/11); add a persistent App dashboard with stable detail tabs, always-visible quota summaries and coherent script/style updates. [Full release notes](https://github.com/YOU-SHOULD-KNOW-ME/antigrative-dashboard/releases/tag/v0.8.4).
+**v0.8.5:** Fix missing speed, cache and context statistics in large conversations. Replace whole-trajectory polling with separate offset reads, incremental updates and bounded projected statistics; document resource experiments and remaining host limits. [Full release notes](https://github.com/YOU-SHOULD-KNOW-ME/antigrative-dashboard/releases/tag/v0.8.5).
 
 ## Preview
 
@@ -68,7 +68,7 @@ Keep the summary visible. Hover for the details.
 ## Antigravity IDE
 
 **v0.7.0** adds a separate VSIX for Google's own standalone IDE. Download
-`antigrative-dashboard-ide-0.8.4.vsix` from the release and choose **Install from VSIX…**
+`antigrative-dashboard-ide-0.8.5.vsix` from the release and choose **Install from VSIX…**
 in the IDE's Extensions view. No desktop App installation is required.
 
 Fully quit the IDE, then start it with
@@ -212,6 +212,10 @@ These are conservative checks on host timing summaries, not proof of buffering. 
 Completed-request TPS, cache counts and whitelisted context estimates are saved automatically in `~/.gemini/antigravity/sidecar_data/antigravity-pulse/panel/data/history-v1/<account-hash>/<conversation-id>.json`. Reloading, restarting, updating or reinstalling the plugin preserves them. Empty or regressing backend data cannot erase a useful saved sample. Saved fallbacks show their saved time in the details. A real 0% cache hit remains 0%.
 
 Records contain whitelisted statistics and model/status only; no prompts, titles, emails or credentials. The current account must be authenticated before its saved files are loaded. Already missing timing cannot be reconstructed. To backfill all conversations still available from the local API and check restart restoration, run `node tools/check-live-history.mjs` with Antigravity open.
+
+## Long conversations
+
+Statistics use separate step and generator-metadata offset reads, with messages disabled for generator requests. Large text/tool payloads are streamed and discarded; updates re-read mutable tails instead of the entire conversation. The former 512 MiB response cap is removed, while projected statistics retain a measured engineering memory budget. See [collection policy, experiments and limits](docs/LONG_CONVERSATIONS.md).
 
 ## Local Token usage
 

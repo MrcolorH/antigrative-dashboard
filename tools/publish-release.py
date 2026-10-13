@@ -26,6 +26,8 @@ def checked_assets(root, tag):
         for required in ['compat/usage-ui.cjs', 'sidecars/panel/rate-quality.mjs', 'sidecars/panel/usage.mjs']:
             archive.getinfo(prefix + required)
         archive.getinfo(prefix + 'sidecars/panel/panel-source.mjs')
+        archive.getinfo(prefix + 'sidecars/panel/trajectory-json.mjs')
+        archive.getinfo(prefix + 'sidecars/panel/trajectory-reader.mjs')
         for required in ['install.sh', 'uninstall.sh', 'install.ps1', 'compat/runtime-ui.mjs', 'compat/theme.cjs', 'compat/host-theme.mjs', 'compat/preferences.mjs', 'compat/sidecar-owner.mjs', 'sidecars/panel/context.mjs', 'cli/statusline.mjs', 'cli/metrics.mjs', 'cli/render.mjs', 'cli/lifecycle.py', 'docs/CLI.md', 'docs/assets/cli-conversation.png', 'docs/assets/cli-conversation-zh.png']:
             archive.getinfo(prefix + required)
     ide_version = json.loads((root / 'ide/package.json').read_text(encoding='utf-8'))['version']
@@ -45,6 +47,8 @@ def checked_assets(root, tag):
             archive.getinfo(name)
         for name in ['compat/usage-ui.cjs', 'sidecars/panel/rate-quality.mjs', 'sidecars/panel/usage.mjs']:
             archive.getinfo('extension/' + name)
+        archive.getinfo('extension/sidecars/panel/trajectory-json.mjs')
+        archive.getinfo('extension/sidecars/panel/trajectory-reader.mjs')
     return [bundle, checksum, ide, ide_checksum]
 
 

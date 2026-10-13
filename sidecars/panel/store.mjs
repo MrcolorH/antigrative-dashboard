@@ -38,7 +38,7 @@ export class MetricsStore {
       if (epoch !== this.epoch) throw new Error('后台已重新连接，请等待刷新');
       const email = user.userStatus?.email;
       const identity = email ? createHash('sha256').update(email).digest('hex') : null;
-      if (identity !== this.identity) { this.quota = null; this.quotaAt = 0; this.sessions.clear(); this.summaries = []; this.summariesAt = 0; }
+      if (identity !== this.identity) { this.client.resetTrajectories?.(); this.quota = null; this.quotaAt = 0; this.sessions.clear(); this.summaries = []; this.summariesAt = 0; }
       this.identity = identity;
       const response = await this.client.call('RetrieveUserQuotaSummary');
       if (epoch !== this.epoch || identity !== this.identity) throw new Error('后台已重新连接，请等待刷新');
@@ -54,7 +54,7 @@ export class MetricsStore {
     const response = await this.client.call('GetAllCascadeTrajectories');
     if (scope !== this.identity || epoch !== this.epoch) throw new Error('后台已重新连接，请等待刷新');
     this.summaries = Object.entries(response.trajectorySummaries || {}).map(([id, value]) => ({
-      id, title: value.summary || '未命名会话', modifiedAt: value.lastModifiedTime, status: value.status,
+      id, title: value.summary || '未命名会话', modifiedAt: value.lastModifiedTime, status: value.status,stepCount:value.stepCount,lastUserInputStepIndex:value.lastUserInputStepIndex,
     })).sort((a, b) => Date.parse(b.modifiedAt) - Date.parse(a.modifiedAt));
     this.summariesAt = Date.now();
     return this.summaries;
@@ -75,7 +75,7 @@ export class MetricsStore {
         if (!current()) throw new Error('后台已重新连接，请等待刷新');
         if (saved) { entry.data = saved.metrics; entry.savedAt = saved.savedAt; }
       }
-      const raw = await this.client.trajectory(id);
+      const raw = await this.client.trajectory(id,{force});
       if (!current()) throw new Error('后台已重新连接，请等待刷新');
       if(this.onTrajectory&&scope){try{await this.onTrajectory(scope,id,raw);if(current())this.usagePersistenceError=false;}catch{if(current())this.usagePersistenceError=true;}}
       if (!current()) throw new Error('后台已重新连接，请等待刷新');

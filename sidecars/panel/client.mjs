@@ -2,6 +2,8 @@ import { readFile } from 'node:fs/promises';
 import { request } from 'node:http';
 import { platformPaths } from '../../compat/platform.mjs';
 import { discoverProcesses } from './discovery.mjs';
+import { TrajectoryJson } from './trajectory-json.mjs';
+import { TrajectoryReader } from './trajectory-reader.mjs';
 
 const SERVICE = '/exa.language_server_pb.LanguageServerService/';
 export function serverFromDiscovery(log, processes) {
@@ -15,8 +17,8 @@ export function serverFromDiscovery(log, processes) {
   return {port,csrf,pid:rows[0].ProcessId};
 }
 export class AntigravityClient {
-  constructor({paths=platformPaths,readLog=readFile,processes=discoverProcesses,now=Date.now}={}) {
-    this.paths=paths;this.readLog=readLog;this.processes=processes;this.now=now;
+  constructor({paths=platformPaths,readLog=readFile,processes=discoverProcesses,now=Date.now,onRpc=null}={}) {
+    this.paths=paths;this.readLog=readLog;this.processes=processes;this.now=now;this.onRpc=onRpc;this.reader=new TrajectoryReader(this);
   }
   server = null;
   discoveredAt = 0;
@@ -69,18 +71,41 @@ export class AntigravityClient {
     try {
       return await new Promise((resolve, reject) => {
         const data = JSON.stringify(body);
-        const req = request({ hostname: '127.0.0.1', port: server.port, method: 'POST', path: SERVICE + method,
+        const projection=['GetCascadeTrajectory','GetCascadeTrajectorySteps','GetCascadeTrajectoryGeneratorMetadata'].includes(method);
+        const started=this.now();
+        // A rejected stream destroys its socket. Do not leave that socket in
+        // the shared agent where an immediate quota refresh could reuse it.
+        const req = request({ hostname: '127.0.0.1', port: server.port, method: 'POST', path: SERVICE + method, ...(projection?{agent:false}:{}),
           headers: { 'Content-Type': 'application/json', 'Connect-Protocol-Version': '1', 'x-codeium-csrf-token': server.csrf, 'Content-Length': Buffer.byteLength(data) } }, res => {
-          let text = '';
+          const projected=projection?new TrajectoryJson():null;
+          let text = '',bytes=0,failed=false;
+          const fail=error=>{if(failed)return;failed=true;req.destroy(error);};
           res.setEncoding('utf8');
-          res.on('data', chunk => { text += chunk; if (text.length > 32 * 1024 * 1024) req.destroy(new Error('会话数据超过采集上限')); });
+          res.on('error',error=>{if(!failed)reject(error);});
+          res.on('data', chunk => {
+            if(failed)return;bytes+=Buffer.byteLength(chunk);
+            // Projected streams have no whole-response byte ceiling. The
+            // retained statistics budget, parser depth and time bound work.
+            if(!(projected&&res.statusCode===200)&&bytes>32*1024*1024){fail(new Error('接口响应超过采集上限'));return;}
+            try { if(projected&&res.statusCode===200)projected.write(chunk);else text+=chunk; }
+            catch(error){fail(error);}
+          });
           res.on('end', () => {
+            if(failed)return;
             if (res.statusCode !== 200) return reject(Object.assign(new Error(`Antigravity 接口 ${method} 返回 ${res.statusCode}`),{status:res.statusCode}));
-            try { resolve(JSON.parse(text)); } catch { reject(new Error('Antigravity 接口返回了无法解析的数据')); }
+            try {
+              const value=projected?projected.end():JSON.parse(text);
+              try{this.onRpc?.({method,bytes,retainedBytes:projected?.retained??Buffer.byteLength(text),ms:this.now()-started});}catch{}
+              resolve(value);
+            }
+            catch(error) { reject(projected?error:new Error('Antigravity 接口返回了无法解析的数据')); }
           });
         });
         req.on('error', reject);
         req.setTimeout(12000, () => req.destroy(new Error('Antigravity 本地接口超时')));
+        // Bound wall time as well as idle time for slow large streams.
+        const deadline=setTimeout(()=>req.destroy(new Error('Antigravity 本地接口超时')),30000);deadline.unref();
+        req.once('close',()=>clearTimeout(deadline));
         req.end(data);
       });
     } catch (error) {
@@ -98,27 +123,6 @@ export class AntigravityClient {
     }
   }
 
-  async trajectory(id) {
-    const first = await this.call('GetCascadeTrajectory', { cascadeId: id, trajectoryVerbosity: 3 });
-    const t = first.trajectory;
-    if (!t) throw new Error('会话暂时没有可用统计');
-    // The LS may page large conversations. Match its frontend pagination so the
-    // session TPS never silently represents only the first page.
-    for (const [field, count, method, offset] of [
-      ['steps', 'numTotalSteps', 'GetCascadeTrajectorySteps', 'stepOffset'],
-      ['generatorMetadata', 'numTotalGeneratorMetadata', 'GetCascadeTrajectoryGeneratorMetadata', 'generatorMetadataOffset'],
-    ]) {
-      t[field] ||= [];
-      const target = Number(first[count] ?? t[field].length);
-      while (t[field].length < target) {
-        const body = { cascadeId: id, [offset]: t[field].length };
-        if (field === 'steps') body.trajectoryVerbosity = 3;
-        const page = await this.call(method, body);
-        const items = page[field] || page.generatorMetadatas || [];
-        if (!items.length) throw new Error('完整会话统计分页暂不可用');
-        t[field].push(...items);
-      }
-    }
-    return first;
-  }
+  resetTrajectories(){this.reader.reset();}
+  trajectory(id,options){return this.reader.read(id,options);}
 }

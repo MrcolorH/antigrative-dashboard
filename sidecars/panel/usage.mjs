@@ -108,7 +108,7 @@ export class DesktopUsage{
         if(!current())return;
         const key=scope+':'+c.id,mark=c.modifiedAt+':'+c.status;
         if(this.fingerprints.get(key)===mark&&!/RUNNING/.test(c.status||''))continue;
-        try{const raw=await this.store.client.trajectory(c.id);if(!current())return;await this.ingest(scope,c.id,raw);this.fingerprints.set(key,mark);}
+        try{const raw=await this.store.client.trajectory(c.id,{summary:{stepCount:c.stepCount,lastModifiedTime:c.modifiedAt,status:c.status,lastUserInputStepIndex:c.lastUserInputStepIndex}});if(!current())return;await this.ingest(scope,c.id,raw);this.fingerprints.set(key,mark);}
         catch{missing++;}
       }
       if(current()){this.missingConversations=missing;this.status=missing?'partial':'ready';this.lastSync=Date.now();}

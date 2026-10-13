@@ -7,7 +7,7 @@
 模型选择旁只显示生成速率、缓存和上下文占用；悬停上下文，一并查看上下文、5 小时和周额度详情。<br>
 缩略信息常驻；鼠标悬停，才展开详细统计。
 
-[![Version 0.8.4](https://img.shields.io/badge/version-0.8.4-91adff?style=flat-square&labelColor=252936)](CHANGELOG.md)
+[![Version 0.8.5](https://img.shields.io/badge/version-0.8.5-91adff?style=flat-square&labelColor=252936)](CHANGELOG.md)
 [![Platforms](https://img.shields.io/badge/host-Windows%20%7C%20Linux%20%7C%20macOS-83d8b9?style=flat-square&labelColor=252936)](COMPATIBILITY.md)
 [![Antigravity 2.21.1 / 2.22.0](https://img.shields.io/badge/Antigravity-2.21.1%20%2F%202.22.0-c5a0ff?style=flat-square&labelColor=252936)](COMPATIBILITY.md)
 [![MIT](https://img.shields.io/badge/license-MIT-d4d9e6?style=flat-square&labelColor=252936)](LICENSE)
@@ -16,7 +16,7 @@
 
 </div>
 
-**v0.8.4 更新：** 修复 [#11](https://github.com/YOU-SHOULD-KNOW-ME/antigrative-dashboard/issues/11) 的 Windows 端口发现与侧栏卡死问题；侧栏改为常驻仪表盘，关键数据和额度持续显示，详情区尺寸稳定，脚本和样式同步换版本。[完整更新说明](https://github.com/YOU-SHOULD-KNOW-ME/antigrative-dashboard/releases/tag/v0.8.4)。
+**v0.8.5 更新：** 修复长对话触发采集上限后速率、缓存和上下文全部空白的问题。改为独立偏移分页和增量读取，移除整包 512MiB 限制；统计缓存预算及测试依据详见文档。[完整更新说明](https://github.com/YOU-SHOULD-KNOW-ME/antigrative-dashboard/releases/tag/v0.8.5)。
 
 ## 看看效果
 
@@ -64,7 +64,7 @@
 ## Antigravity IDE
 
 **v0.7.0** 新增反重力自己的独立 IDE 适配。下载发布页的
-`antigrative-dashboard-ide-0.8.4.vsix`，在 IDE 扩展页选择「从 VSIX 安装」。
+`antigrative-dashboard-ide-0.8.5.vsix`，在 IDE 扩展页选择「从 VSIX 安装」。
 仅安装 IDE 的用户也可以使用，无需先装桌面 App。
 
 完全退出 IDE 后，使用带
@@ -211,6 +211,10 @@ Antigravity 的 `inputTokens` 是未缓存输入。缓存率 = 缓存读取 ÷�
 已完成请求的 tok/s、cache 和数值统计自动保存到 `~/.gemini/antigravity/sidecar_data/antigravity-pulse/panel/data/history-v1/<账号哈希>/<对话ID>.json`。重载、重启、更新或重装插件都会保留。接口临时返回空数据或较少采样时，不覆盖已有有效统计；恢复值会在详情中注明保存时间。真实 0% 缓存命中率正常显示。
 
 只保存白名单数值、模型和状态，不保存正文、标题、邮箱或凭据。确认当前账号后才读取该账号的历史。已经缺失的请求时长无法重建。打开 Antigravity 后执行 `node tools/check-live-history.mjs`，可补存当前接口仍能读取的所有历史对话，并验证重启恢复。
+
+## 长对话采集
+
+步骤与生成统计分开按偏移读取，生成元数据请求关闭消息正文。大段文本和工具输出流式跳过，后续刷新只重读可能变化的尾部。已移除整包 512MiB 响应限制；统计缓存仍有基于资源测试选择的工程预算，超出时明确提示，不截断后伪造完整统计。详见[采集策略、实验依据与限制](docs/LONG_CONVERSATIONS.md)。
 
 ## 本地 Token 用量统计
 

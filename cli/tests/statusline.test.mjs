@@ -121,10 +121,10 @@ test('busy zero cache snapshots are pending, never a fabricated zero or a previo
   }
   assert.equal(normalize({ ...cachePayload(2100, 0), agent_state:'idle' }).cacheRate.percentage, 0);
   assert.equal(normalize({ ...cachePayload(0, 0), agent_state:'idle' }).cacheRate.reason, 'empty-input');
-  assert.ok(run({...cachePayload(),agent_state:'idle'}, ['--no-color']).stdout.includes('98.9%'));
-  const result=run({...cachePayload(2100,0),agent_state:'working'}, ['--no-color']);
+  assert.ok(run({...cachePayload(),agent_state:'idle'}, ['--language','en','--no-color']).stdout.includes('98.9%'));
+  const result=run({...cachePayload(2100,0),agent_state:'working'}, ['--language','en','--no-color']);
   assert.equal(result.status,0);assert.match(result.stdout,/Cache --/);assert.doesNotMatch(result.stdout,/98\.9%|0 read/);
-  assert.match(run({...cachePayload(2100,0),agent_state:'idle'}, ['--no-color']).stdout,/Cache 0% · 0 read/);
+  assert.match(run({...cachePayload(2100,0),agent_state:'idle'}, ['--language','en','--no-color']).stdout,/Cache 0% · 0 read/);
 });
 
 test('narrow first row retains context and cache percentages before secondary read counts', () => {
