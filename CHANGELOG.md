@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.8.6 — 2026-10-14
+
+- Fix [#12](https://github.com/YOU-SHOULD-KNOW-ME/antigrative-dashboard/issues/12): count normalized uncached input, cache reads/writes and output independently of cache-rate eligibility. Track component coverage; mark incomplete values as lower bounds without discarding readable counters.
+- Accept explicit zero-total-input tool requests as neutral cache samples, including missing provider labels. Keep the zero-denominator rate unavailable and explain it in English/Chinese. Missing or malformed input remains distinct from zero.
+- Restore only cache statistics when cache eligibility regresses. Preserve current rate-quality reclassification, incremental/statistical-stream collection, usage ledger, context and isolation behavior.
+- Recover already recorded input/output from schema-1 history without deleting saved statistics. Reject malformed counters and unsafe sums; maintain original cache timestamps and atomic writes.
+- Add data/restart/migration and production-renderer regressions for long tool chains, partial input, cache-only input, zero input, corrupted records and live continued output. Both App ZIP and IDE VSIX include the shared fix; CLI behavior is unchanged.
+
 ## 0.8.5 — 2026-10-13
 
 - Replace whole-trajectory polling with independent offset reads for steps and generator metadata (`includeMessages: false`), using summaries, cached immutable prefixes and revalidated mutable tails. Incrementally validate/project returned JSON without retaining prompts, attachments or tool output. Preserve tool-only classification rather than substituting reduced verbosity that loses tool-call markers.

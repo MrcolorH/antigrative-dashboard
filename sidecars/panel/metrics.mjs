@@ -18,7 +18,7 @@ export function seconds(value) {
 }
 
 export function tokenCount(value) {
-  if (value === undefined || value === null || value === '') return null;
+  if (typeof value !== 'number' && !(typeof value === 'string' && /^\d+$/.test(value))) return null;
   const n = Number(value);
   return Number.isSafeInteger(n) && n >= 0 ? n : null;
 }
@@ -30,13 +30,18 @@ export function requestCacheMetrics(usage) {
   const read = tokenCount(usage.cacheReadTokens) ?? 0;
   const write = tokenCount(usage.cacheWriteTokens) ?? 0;
   const provider = String(usage.apiProvider || '');
-  if (input === null || !/GOOGLE_GEMINI|OPENAI|ANTHROPIC/.test(provider)) return null;
+  if (input === null) return null;
   // Antigravity ModelUsageStats normalizes inputTokens to uncached input,
   // including Gemini (verified against live records with cacheRead > input).
   // These are NOT upstream Gemini/OpenAI prompt_tokens. Add the separate
   // cache read/write counts exactly once for this local interface.
   const total = input + read + write;
-  if (!Number.isSafeInteger(total) || total <= 0 || read + write > total) return null;
+  // A tool follow-up can explicitly report zero input. It is a valid neutral
+  // sample, even though an all-zero denominator cannot produce a hit ratio.
+  if (!Number.isSafeInteger(total) || total < 0 || read + write > total) return null;
+  // A provider label is unnecessary for a validated zero denominator: it
+  // contributes neither numerator nor denominator and never invents a ratio.
+  if (total > 0 && !/GOOGLE_GEMINI|OPENAI|ANTHROPIC/.test(provider)) return null;
   return { inputTokens:total, cachedTokens:read, cacheWriteTokens:write, uncachedTokens:total-read-write };
 }
 
@@ -60,6 +65,11 @@ export function trajectoryMetrics(response) {
   const counts = { input: 0, output: 0, responseOutput: 0, thinkingOutput: 0, cacheRead: 0, cacheWrite: 0 };
   let modelSeconds = 0, ttftSeconds = 0, ttftSamples = 0, missingTiming = 0;
   const cache = { inputTokens:0, cachedTokens:0, cacheWriteTokens:0, uncachedTokens:0, outputTokens:0, measuredRequests:0, missingRequests:0 };
+  // Token availability is independent of cache-ratio availability. In particular,
+  // a historical request may retain output usage but lack normalized input data.
+  const tokens = { inputTokens:0, cachedTokens:0, cacheWriteTokens:0, uncachedTokens:0, outputTokens:0,
+    measuredRequests:0, inputRequests:0, outputRequests:0, missingInputRequests:0, missingOutputRequests:0,
+    uncachedRequests:0, cachedRequests:0, cacheWriteRequests:0 };
   for (const [index, generator] of generators.entries()) {
     const chat = generator.chatModel;
     if (!chat?.usage) continue;
@@ -83,6 +93,22 @@ export function trajectoryMetrics(response) {
       cache.measuredRequests++;
     } else cache.missingRequests++;
     const output = tokenCount(usage.outputTokens);
+    // These fields come from the local normalized ModelUsageStats contract,
+    // not upstream prompt_tokens. Account for each readable component even
+    // when another component (or the cache-ratio provider) is unavailable.
+    const input = tokenCount(usage.inputTokens);
+    const read = usage.cacheReadTokens === undefined && input !== null ? 0 : tokenCount(usage.cacheReadTokens);
+    const write = usage.cacheWriteTokens === undefined && input !== null ? 0 : tokenCount(usage.cacheWriteTokens);
+    const parts = [['uncachedTokens','uncachedRequests',input],['cachedTokens','cachedRequests',read],['cacheWriteTokens','cacheWriteRequests',write]];
+    for (const [field,coverage,value] of parts) if (value !== null) {
+      tokens[field] = tokens[field] === null ? null : tokenCount(tokens[field]+value);
+      tokens[coverage]++;
+    }
+    if (input !== null && read !== null && write !== null && tokenCount(input+read+write) !== null) tokens.inputRequests++;
+    else tokens.missingInputRequests++;
+    if (output !== null) { tokens.outputTokens = tokens.outputTokens === null ? null : tokenCount(tokens.outputTokens+output); tokens.outputRequests++; }
+    else tokens.missingOutputRequests++;
+    if (parts.some(([, ,value])=>value!==null) || output !== null) tokens.measuredRequests++;
     const visible = tokenCount(usage.responseOutputTokens);
     const thinking = tokenCount(usage.thinkingOutputTokens);
     // Gemini may finish thinking before the first visible streaming token. Pair the
@@ -132,11 +158,16 @@ export function trajectoryMetrics(response) {
   const toolSeconds = unionSeconds(tools.map(s => [Date.parse(s.metadata.startedAt || s.metadata.createdAt), Date.parse(s.metadata.completedAt)]));
   const latest = samples.at(-1) || null;
   const lastChat = [...generators].reverse().find(g => g.chatModel)?.chatModel;
+  const inputParts=[tokens.uncachedTokens,tokens.cachedTokens,tokens.cacheWriteTokens];
+  tokens.inputTokens = tokenCount(inputParts.reduce((sum,value)=>sum+(value??0),0));
+  const totalTokens=tokenCount((tokens.inputTokens??0)+(tokens.outputTokens??0));
   return {
     source: 'Antigravity request metadata', status: response.status || null,
     conversationId: trajectory.cascadeId || null,
     steps: Number(response.numTotalSteps ?? steps.length), rounds: steps.filter(s => /USER_INPUT/.test(String(s.type))).length,
     requests: ids.size, measuredRequests: accepted.length, missingTiming, excludedTiming, rateWarnings, timingReasons, rateVersion: RATE_VERSION, counts,
+    tokens:{...tokens,totalTokens,
+      complete:tokens.missingInputRequests===0&&tokens.missingOutputRequests===0&&inputParts.every(value=>value!==null)&&tokens.outputTokens!==null&&totalTokens!==null},
     cache:{...cache,totalTokens:cache.inputTokens+cache.outputTokens,hitRate:cache.inputTokens>0?cache.cachedTokens/cache.inputTokens:null,complete:cache.missingRequests===0},
     tps: streamingSeconds > 0 ? sampledTokens / streamingSeconds : null, latestTps: latest?.status === 'ok' ? latest.tps : null,
     latestRateStatus: latest?.status ?? 'missing',

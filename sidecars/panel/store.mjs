@@ -1,7 +1,7 @@
 import { createHash } from 'node:crypto';
 import { AntigravityClient } from './client.mjs';
 import { quotaMetrics, trajectoryMetrics } from './metrics.mjs';
-import { SessionHistory, usableMetrics, shouldKeepSaved } from './history.mjs';
+import { SessionHistory, usableMetrics, reconcileMetrics } from './history.mjs';
 
 const GUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 export class MetricsStore {
@@ -80,17 +80,7 @@ export class MetricsStore {
       if(this.onTrajectory&&scope){try{await this.onTrajectory(scope,id,raw);if(current())this.usagePersistenceError=false;}catch{if(current())this.usagePersistenceError=true;}}
       if (!current()) throw new Error('后台已重新连接，请等待刷新');
       const fresh = trajectoryMetrics(raw);
-      if (shouldKeepSaved(entry.data,fresh)) {
-        entry.updatedAt = Date.now();
-        entry.data = {...entry.data,context:fresh.context,contextRestored:false,restoredFromHistory:true,savedAt:entry.savedAt || null};
-        if (fresh.context) {
-          try { const saved=await this.history.save(scope,id,entry.data); if(saved)entry.savedAt=saved.savedAt; }
-          catch { this.persistenceError='统计暂时无法保存到本地'; }
-        }
-        if (!current()) throw new Error('后台已重新连接，请等待刷新');
-        return entry.data;
-      }
-      entry.data = {...fresh,conversationId:id,contextRestored:false,restoredFromHistory:false}; entry.updatedAt = Date.now();
+      entry.data = {...reconcileMetrics(entry.data,fresh,entry.savedAt || null),conversationId:id}; entry.updatedAt = Date.now();
       try { const saved = await this.history.save(scope,id,entry.data); if (saved) entry.savedAt = saved.savedAt; if (current()) this.persistenceError = null; }
       catch { this.persistenceError = '统计暂时无法保存到本地'; }
       if (!current()) throw new Error('后台已重新连接，请等待刷新');

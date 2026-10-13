@@ -644,11 +644,26 @@ module.exports = function installAgPulseInlineWidget() {
     text('rate-note',[language.errorMessage(data.error||data.sessionError),language.rateNote(speed)].filter(Boolean).join(' ')+savedNote+saveWarning);
     const cache=speed?.cache;
     text('cache-rate',pct(cache?.hitRate));text('cache-detail-rate',pct(cache?.hitRate));
-    text('cache-total',cache?.measuredRequests?`${compact(cache.totalTokens)} tok`:'— tok');
-    text('cache-coverage',cache?.measuredRequests?`${count(cache.totalTokens)} tok`:'— tok');
-    for(const [field,id]of[['cachedTokens','cache-read'],['uncachedTokens','cache-miss'],['cacheWriteTokens','cache-write'],['outputTokens','cache-output']])text(id,cache?.measuredRequests?`${count(cache[field])} tok`:'—');
-    hidden($('cache-write-row'),!(cache?.cacheWriteTokens>0));
-    text('cache-note',(cache?.measuredRequests?t('cacheBasis')+(cache.missingRequests?' '+t('cacheMissing',{n:cache.missingRequests}):''):t(empty?'newConversationStats':'cacheUnavailable'))+savedNote+saveWarning);
+    const tokens=speed?.tokens || cache;
+    const partial=tokens?.measuredRequests&&tokens.complete===false;
+    const prefix=partial?'≥ ':'';
+    const hasTotal=tokens?.measuredRequests&&Number.isSafeInteger(tokens.totalTokens)&&tokens.totalTokens>=0;
+    text('cache-total',hasTotal?`${prefix}${compact(tokens.totalTokens)} tok`:'— tok');
+    text('cache-coverage',hasTotal?`${prefix}${count(tokens.totalTokens)} tok`:'— tok');
+    const inputCoverage={uncachedTokens:'uncachedRequests',cachedTokens:'cachedRequests',cacheWriteTokens:'cacheWriteRequests'};
+    for(const [field,id]of[['cachedTokens','cache-read'],['uncachedTokens','cache-miss'],['cacheWriteTokens','cache-write'],['outputTokens','cache-output']]) {
+      const available=field==='outputTokens'?(tokens?.outputAvailable??(tokens?.outputRequests??tokens?.measuredRequests)):(tokens?.[inputCoverage[field]]??tokens?.inputRequests??tokens?.measuredRequests);
+      const missing=field==='outputTokens'?tokens?.missingOutputRequests||tokens?.coverageUnknown:
+        (tokens?.[inputCoverage[field]]!=null?tokens[inputCoverage[field]]<(speed?.requests||0):tokens?.missingInputRequests);
+      const known=Number.isSafeInteger(tokens?.[field])&&tokens[field]>=0;
+      text(id,available&&known?`${missing?'≥ ':''}${count(tokens[field])} tok`:'—');
+    }
+    hidden($('cache-write-row'),!(tokens?.cacheWriteTokens>0));
+    const cacheSaved=speed?.cacheRestoredFromHistory?' '+t('savedCache',{time:speed.cacheSavedAt?language.resetDate(speed.cacheSavedAt):'—'}):'';
+    const tokenPartial=partial&&speed?.tokens?' '+(tokens.coverageUnknown?t('tokenLegacy'):t('tokenPartial',{input:tokens.missingInputRequests??t('unknownCoverage'),output:tokens.missingOutputRequests??t('unknownCoverage')})):'';
+    const coverage=cache?.missingRequests?' '+(speed?.tokens?t('cacheCoverage',{measured:cache.measuredRequests,total:cache.measuredRequests+cache.missingRequests}):t('cacheMissing',{n:cache.missingRequests})):'';
+    const zeroInput=cache?.measuredRequests&&cache.inputTokens===0?' '+t('cacheZeroInput'):'';
+    text('cache-note',(cache?.measuredRequests?t('cacheBasis')+coverage+zeroInput:t(empty?'newConversationStats':'cacheUnavailable'))+tokenPartial+cacheSaved+savedNote+saveWarning);
     for(const [window,name]of[['5h','five'],['weekly','week']]){
       const b=group?.windows?.[window];text(name,pct(b?.remaining));text(`${name}-balance`,pct(b?.remaining));text(`${name}-reset`,date(b?.resetAt));
       style($(`${name}-fill`),'width',typeof b?.remaining==='number'?`${b.remaining*100}%`:'0%');style($(`${name}-fill`),'background',b?.remaining<.05?'var(--pulse-danger)':b?.remaining<.2?'var(--pulse-warning)':'');

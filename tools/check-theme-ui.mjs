@@ -228,7 +228,9 @@ async function checkRefresh(page,button){
       const host=document.getElementById('ag-pulse-status-bar');
       return (host?.shadowRoot||document).querySelector(selector)?.getAttribute('aria-busy')==='false';
     },await button.evaluate(e=>e.id?'#'+e.id:'.refresh'));
-    assert.equal(queuedForced,1,'Manual refresh must run once after the ongoing poll');
+    assert.equal(queuedForced,1,'Manual refresh must run once after the ongoing poll: '+JSON.stringify({
+      errors,health:await page.locator('#health-note').count()?await page.locator('#health-note').textContent():null,
+      busy:await button.getAttribute('aria-busy')}));
   }finally{clearTimeout(timeout);unblock();await page.unrouteAll({behavior:'wait'});}
 }
 try {

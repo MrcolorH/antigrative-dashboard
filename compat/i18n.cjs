@@ -2,6 +2,10 @@
 module.exports = function createDashboardI18n(initialLanguage) {
   const dictionary={
     en:{
+      tokenPartial:'Known tokens only (≥): {input} requests lack input usage; {output} lack output usage. Output is counted independently of cache availability.',
+      tokenLegacy:'Saved token usage is a lower bound (≥); request-level coverage cannot be verified.',unknownCoverage:'unknown',
+      cacheZeroInput:'Reported total input is 0; the cache hit rate has no denominator.',
+      savedCache:'Cache ratio uses saved statistics ({time}).',savedSpeed:'Speed uses saved statistics ({time}).',
       panelSpeed:'Speed',panelCache:'Cache',panelContext:'Context',panelDetails:'Metric details',panelUsed:'used',panelSharedQuota:'Shared quota',
       newConversationStats:'New conversation: send a message or open an existing conversation to view its statistics. Account quota is shown separately below.',
       subagentStats:'Current subagent statistics',accountQuota:'Account quota, shared across agents.',
@@ -25,6 +29,10 @@ module.exports = function createDashboardI18n(initialLanguage) {
       cacheCoverage:'{measured} of {total} requests',language:'Language',switchLanguage:'Switch to Chinese',languageSaveFailed:'Language preference could not be saved. Please retry.',reconnecting:'Waiting to reconnect',panelUnavailable:'The statistics panel cannot connect right now.',invalidData:'Incompatible statistics data',
     },
     'zh-CN':{
+      tokenPartial:'仅统计已知 Token（≥）：{input} 次请求缺少输入用量，{output} 次缺少输出用量。输出独立于缓存统计。',
+      tokenLegacy:'已保存 Token 用量为下界（≥）；无法确认逐请求统计覆盖情况。',unknownCoverage:'未知',
+      cacheZeroInput:'报告的总输入为 0，缓存命中率无可计算的分母。',
+      savedCache:'缓存率使用已保存统计（{time}）。',savedSpeed:'速度使用已保存统计（{time}）。',
       panelSpeed:'速度',panelCache:'缓存',panelContext:'上下文',panelDetails:'统计详情',panelUsed:'已用',panelSharedQuota:'共享额度',
       newConversationStats:'当前为新对话：发送消息或打开已有对话后显示该会话统计。账号额度在下方单独展示。',
       subagentStats:'当前子代理统计',accountQuota:'账号共享额度，所有代理共用。',
