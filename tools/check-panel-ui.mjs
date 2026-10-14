@@ -15,7 +15,8 @@ const html=panelPageSource();
 const code=panelAppSource(),requests=[],errors=[],results=[];
 const id='11111111-1111-1111-1111-111111111111';
 let prefs={language:'en',revision:1},metricsCalls=0,failMetrics=false,rate=38.7;
-const sample=()=>({connection:'live',serverTime:new Date().toISOString(),quotaUpdatedAt:new Date().toISOString(),preferences:prefs,groups:[{id:'gemini',name:'Gemini',windows:{'5h':{available:true,remaining:.8,resetAt:new Date(Date.now()+3600000).toISOString()},weekly:{available:true,remaining:.75,resetAt:new Date(Date.now()+86400000).toISOString()}}}],speed:trajectoryMetrics({trajectory:{cascadeId:id,steps:[{type:'USER_INPUT'}],generatorMetadata:Array.from({length:23},(_,i)=>({chatModel:{modelDisplayName:'Gemini 3.8 Flash',streamingDuration:(100/rate)+'s',timeToFirstToken:'1.2s',usage:{messageId:'fixture-'+i,inputTokens:100,cacheReadTokens:300,outputTokens:100,responseOutputTokens:100,cacheWriteTokens:0,apiProvider:'API_PROVIDER_GOOGLE_GEMINI'},chatStartMetadata:{contextWindowMetadata:{estimatedTokensUsed:20000,maxContextTokens:100000}}}}))}})});
+const transcriptSample={version:1,status:'ready',complete:true,userTokens:100,assistantTokens:200,toolTokens:50,systemTokens:10,totalTokens:360,matchedSteps:4,compactionMarkers:1,imageSteps:0};
+const sample=()=>({connection:'live',serverTime:new Date().toISOString(),quotaUpdatedAt:new Date().toISOString(),preferences:prefs,groups:[{id:'gemini',name:'Gemini',windows:{'5h':{available:true,remaining:.8,resetAt:new Date(Date.now()+3600000).toISOString()},weekly:{available:true,remaining:.75,resetAt:new Date(Date.now()+86400000).toISOString()}}}],speed:{transcriptStats:transcriptSample,...trajectoryMetrics({trajectory:{cascadeId:id,steps:[{type:'USER_INPUT'}],generatorMetadata:Array.from({length:23},(_,i)=>({chatModel:{modelDisplayName:'Gemini 3.8 Flash',streamingDuration:(100/rate)+'s',timeToFirstToken:'1.2s',usage:{messageId:'fixture-'+i,inputTokens:100,cacheReadTokens:300,outputTokens:100,responseOutputTokens:100,cacheWriteTokens:0,apiProvider:'API_PROVIDER_GOOGLE_GEMINI'},chatStartMetadata:{contextWindowMetadata:{estimatedTokensUsed:20000,maxContextTokens:100000}}}}))}})}});
 const server=createServer(async(req,res)=>{
  const url=new URL(req.url,'http://localhost'),path=url.pathname;requests.push(path);
  if(path==='/api/metrics'||path==='/api/preferences'){
@@ -59,6 +60,11 @@ try{
   assert.equal(await view.locator('#context-host-limit').textContent(),'100,000 tok');
   assert.equal(await view.locator('#context-provider-limit').textContent(),'1,048,576 tok');
   assert.equal(await view.locator('#context-compaction-limit').textContent(),'Unknown');
+  assert.equal(await view.locator('#transcript-total').textContent(),'360 tok');
+  await view.locator('#context-tab').click();await view.locator('#transcript-details summary').click();
+  assert.equal(await view.locator('#transcript-user').textContent(),'100');assert.equal(await view.locator('#transcript-markers').textContent(),'1');
+  assert.equal(await view.locator('#transcript-details summary span').first().textContent(),'Recorded text estimate');
+  await view.locator('#speed-tab').click();
   await view.locator('#strip-tps').filter({hasText:'38.7'}).waitFor();
   assert.deepEqual(await view.locator('.metric-label span').allTextContents(),['Speed','Cache','Context']);
   assert.ok(await view.locator('#strip-tps').evaluate(e=>parseFloat(getComputedStyle(e).fontSize))>=18);
@@ -82,6 +88,7 @@ try{
   }
   await view.locator('#language-toggle').click();await view.locator('#language-toggle').filter({hasText:'中'}).waitFor();
   assert.equal(await view.locator('#context-compaction-limit').textContent(),'未知');
+  assert.equal(await view.locator('#transcript-details summary span').first().textContent(),'已记录文本估算');
   assert.equal(await view.locator('#context-host-limit').textContent(),'100,000 tok');
   assert.equal(await view.locator('#strip-context').textContent(),'20%');
   assert.deepEqual(await view.locator('.metric-label span').allTextContents(),['速度','缓存','上下文']);

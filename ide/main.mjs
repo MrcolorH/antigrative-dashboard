@@ -6,6 +6,7 @@ import {RuntimeUi,makeRendererSource} from '../compat/runtime-ui.mjs';
 import {PreferencesStore} from '../compat/preferences.mjs';
 import {MetricsStore} from '../sidecars/panel/store.mjs';
 import {SessionHistory} from '../sidecars/panel/history.mjs';
+import {TranscriptReader,transcriptBrainRoot} from '../sidecars/panel/transcript.mjs';
 import {DesktopUsage as LocalUsage,UsageLedger} from '../sidecars/panel/usage.mjs';
 import {IdeClient} from './client.mjs';
 import {ideTargets} from './runtime.mjs';
@@ -15,7 +16,7 @@ if(!profile)throw Error('IDE profile is required');
 const data=process.env.AG_PULSE_IDE_DATA||join(profile,'User','globalStorage','you-should-know-me.antigrative-dashboard-ide');
 let debugPort=0;
 const client=new IdeClient({profile,debugPort:()=>debugPort});
-const store=new MetricsStore(client,{history:new SessionHistory(join(data,'history-v1'))});
+const store=new MetricsStore(client,{history:new SessionHistory(join(data,'history-v1')),transcripts:new TranscriptReader({root:transcriptBrainRoot('ide')})});
 const usage=new LocalUsage(store,new UsageLedger(join(data,'usage-v1'),{source:'ide-local'}));
 store.onTrajectory=(scope,id,raw)=>usage.ingest(scope,id,raw);
 const preferences=new PreferencesStore({file:join(data,'preferences.json')});
@@ -34,7 +35,7 @@ const snapshot=async input=>{
   else{
     try{
       const server=await client.discover();
-      if(server.pid!==store.serverPid){store.epoch++;store.identity=null;store.quota=null;store.quotaAt=0;store.sessions.clear();store.serverPid=server.pid;}
+      if(server.pid!==store.serverPid){store.epoch++;store.transcripts?.reset();store.identity=null;store.quota=null;store.quotaAt=0;store.sessions.clear();store.serverPid=server.pid;}
       await store.refreshQuota(input.force);
       value={connection:'live',speed:null,groups:store.quota||[],quotaUpdatedAt:new Date(store.quotaAt).toISOString()};
     }catch{value={connection:'offline',speed:null,groups:[],error:'IDE local API unavailable'};}

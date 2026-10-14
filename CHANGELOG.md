@@ -1,5 +1,15 @@
 # Changelog
 
+## Unreleased — PR #15 follow-up
+
+- Preserve host-based context occupancy and the validated PR #14 capacity/reference semantics.
+- Add a separate, collapsible recorded-text estimate for App/IDE, grouped by user text, replies/thinking, tool output and system text. Compaction markers/image steps use explicit supported types; they do not invent current-context contents or a compaction trigger.
+- Filter undo/rewind and stale branches using explicit step indexes and current type/timestamp identity, including a zero-step boundary; cumulative recorded consumption remains unchanged.
+- Replace synchronous whole-file/glob collection with scoped, asynchronous incremental projection, one background job, bounded LRU numeric summaries and chunk/pass budgets. Reset on account/backend changes and detected log replacement/truncation/rewrite.
+- Strictly sanitize saved estimates; keep loading/I/O states out of measured history and keep optional failure independent of core metrics.
+- Add cross-platform resource, corruption, rewind, revision, persistence and bilingual browser regressions. No real local compaction/image-event acceptance is claimed; see `docs/CONTEXT_LIMITS.md` for coverage and limits.
+
+
 ## 0.8.6 — 2026-10-14
 
 - Fix [#12](https://github.com/YOU-SHOULD-KNOW-ME/antigrative-dashboard/issues/12): count normalized uncached input, cache reads/writes and output independently of cache-rate eligibility. Track component coverage; mark incomplete values as lower bounds without discarding readable counters.
