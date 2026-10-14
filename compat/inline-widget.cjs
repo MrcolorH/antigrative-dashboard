@@ -630,11 +630,39 @@ module.exports = function installAgPulseInlineWidget() {
     text('context-summary',hasCapacity?t('contextUsed',{used:Math.round(context.usedFraction*100),remaining:Math.round(context.remainingFraction*100)}):t(empty?'waitingRequest':'contextUnknown'));
     text('context-tokens',context?t('contextTokens',{used:compact(context.usedTokens),max:context.maxTokens===null?'—':compact(context.maxTokens)}):'—');
     text('context-model',context?.model||'—');
+    if($('context-native-limit'))text('context-native-limit',context?.maxTokens?`${compact(context.maxTokens)} tok (${count(context.maxTokens)})`:'—');
+    if($('context-comp-limit')){
+      const compLimit=context?.compressionLimit;
+      const compPct=compLimit&&context.usedTokens?` (${Math.round((context.usedTokens/compLimit)*100)}%)`:'';
+      text('context-comp-limit',compLimit?`${compact(compLimit)} tok${compPct}`:'—');
+    }
+    if($('context-status')){
+      const isComp=context?.compressionDetected||(context?.compactionCount>0);
+      text('context-status',isComp?t('contextCompressed',{count:context.compactionCount||1}):t('contextNormal'));
+    }
+    if($('context-images-row')){
+      const imgCount=context?.imageGenStepCount||0;
+      hidden($('context-images-row'),imgCount<=0);
+      if($('context-images'))text('context-images',`📷 ${imgCount}`);
+    }
     const restored=context&&(speed.contextRestored===true||speed.restoredFromHistory&&speed.contextRestored!==false);
-    text('context-note',(context?t('contextBasis'):t(empty?'newConversationStats':'contextUnavailable'))+(restored?' '+t('contextSaved',{time:speed.savedAt?language.resetDate(speed.savedAt):'—'}):'')+(hasCapacity&&context.usedFraction>1?' '+t('contextExceeded'):''));
+    const basisText=context?.source==='Antigravity session transcript'?t('contextTranscriptBasis'):t('contextBasis');
+    const dualNote=context?.maxTokens&&context?.compressionLimit?' '+t('contextDualBasis',{max:compact(context.maxTokens),compLimit:compact(context.compressionLimit)}):'';
+    text('context-note',(context?basisText+dualNote:t(empty?'newConversationStats':'contextUnavailable'))+(restored?' '+t('contextSaved',{time:speed.savedAt?language.resetDate(speed.savedAt):'—'}):'')+(hasCapacity&&context.usedFraction>1?' '+t('contextExceeded'):''));
     style($('context-fill'),'width',hasCapacity?`${Math.min(1,context.usedFraction)*100}%`:'0%');
     style($('context-fill'),'background',hasCapacity&&context.usedFraction>=.9?'var(--pulse-danger)':'');
     attribute($('context-track'),'aria-valuenow',hasCapacity?Math.min(100,context.usedFraction*100):null);attribute($('context-track'),'aria-valuemin','0');attribute($('context-track'),'aria-valuemax','100');
+    const bd=context?.breakdown;
+    hidden($('context-tools-row'),!bd);
+    hidden($('context-agent-row'),!bd);
+    hidden($('context-user-row'),!bd);
+    if($('context-system-row'))hidden($('context-system-row'),!bd||!bd.systemTokens);
+    if(bd&&context.usedTokens>0){
+      text('context-tools',`${compact(bd.toolTokens)} tok (${Math.round((bd.toolTokens/context.usedTokens)*100)}%)`);
+      text('context-agent',`${compact(bd.agentTokens)} tok (${Math.round((bd.agentTokens/context.usedTokens)*100)}%)`);
+      text('context-user',`${compact(bd.userTokens)} tok (${Math.round((bd.userTokens/context.usedTokens)*100)}%)`);
+      if($('context-system'))text('context-system',`${compact(bd.systemTokens)} tok (${Math.round((bd.systemTokens/context.usedTokens)*100)}%)`);
+    }
     text('tps',rate(speed?.tps));text('rounds',speed?t('rounds',{rounds:speed.rounds,steps:speed.steps}):'');
     text('samples',speed?t('sample',{rounds:speed.rounds,steps:speed.steps,requests:speed.measuredRequests}):t('waitingRequest'));text('model-time',seconds(speed?.modelSeconds));text('tool-time',seconds(speed?.toolSeconds));text('ttft',seconds(speed?.ttftSeconds));text('session-rate',`${rate(speed?.tps)} tok/s`);text('latest-rate',`${rate(speed?.latestTps)} tok/s`);text('tokens',speed?`${count(speed.counts.responseOutput)} / ${count(speed.counts.thinkingOutput)} tok`:'—');
     if(speed?.latestRateStatus==='unreliable')text('latest-rate',t('timingUnreliable'));

@@ -58,15 +58,150 @@ export function modelCompressionLimit(model) {
   return null;
 }
 
-export function contextMetrics(metadata, { model = null, sampledAt = null } = {}) {
-  if (!metadata || typeof metadata !== 'object' || Array.isArray(metadata)) return null;
-  const usedTokens = count(metadata.estimatedTokensUsed), rawMax = count(metadata.maxContextTokens);
+export function estimateTokensFromText(text) {
+  if (!text || typeof text !== 'string') return 0;
+  let asciiChars = 0;
+  let nonAsciiChars = 0;
+  for (let i = 0; i < text.length; i++) {
+    if (text.charCodeAt(i) < 128) {
+      asciiChars++;
+    } else {
+      nonAsciiChars++;
+    }
+  }
+  return Math.ceil(asciiChars / 4 + nonAsciiChars / 1.5);
+}
+
+import fs from 'node:fs';
+import path from 'node:path';
+import os from 'node:os';
+
+const transcriptCache = new Map();
+
+export function findTranscriptPath(convId) {
+  if (!convId || typeof convId !== 'string') return null;
+  const candidates = [];
+  const basePatterns = [
+    path.join(os.homedir(), '.gemini/antigravity*/brain', convId, '.system_generated/logs/transcript_full.jsonl'),
+    path.join(os.homedir(), '.gemini/antigravity*/brain', convId, '.system_generated/logs/transcript.jsonl')
+  ];
+  for (const pattern of basePatterns) {
+    try {
+      if (typeof fs.globSync === 'function') {
+        candidates.push(...fs.globSync(pattern));
+      }
+    } catch {}
+  }
+  if (!candidates.length) return null;
+  const full = candidates.find(c => c.endsWith('transcript_full.jsonl'));
+  if (full) return full;
+  return candidates.sort((a, b) => {
+    try {
+      return fs.statSync(b).mtimeMs - fs.statSync(a).mtimeMs;
+    } catch { return 0; }
+  })[0];
+}
+
+export function parseTranscriptContent(content, maxSteps = null) {
+  if (typeof content !== 'string' || !content.trim()) return null;
+  const lines = content.split('\n');
+  let userTok = 0, agentTok = 0, toolTok = 0, systemTok = 0, steps = 0;
+  let compactionCount = 0;
+  let imageGenStepCount = 0;
+  let prevCheckpointInputTokens = -1;
+  let compressionDetected = false;
+
+  for (const line of lines) {
+    const trimmed = line.trim();
+    if (!trimmed) continue;
+    if (typeof maxSteps === 'number' && maxSteps > 0 && steps >= maxSteps) {
+      break;
+    }
+    try {
+      const step = JSON.parse(trimmed);
+      steps++;
+      const stype = String(step.type || '');
+      const src = String(step.source || '');
+      const c = typeof step.content === 'string' ? step.content : (step.content ? JSON.stringify(step.content) : '');
+      const thinking = typeof step.thinking === 'string' ? step.thinking : '';
+      const toolCalls = step.tool_calls ? JSON.stringify(step.tool_calls) : '';
+
+      // Image generation step detection: keywords in type or generatorModel
+      const stepModel = String(step.metadata?.generatorModel || step.model || '');
+      if (/image|generate/i.test(stype) || /nano|banana|image/i.test(stepModel)) {
+        imageGenStepCount++;
+      }
+
+      // Checkpoint and compaction detection
+      if (c.includes('# Resuming from a compaction') || c.includes('<CONTEXT_SUMMARY>') || c.includes('Resuming from a compaction')) {
+        compactionCount++;
+        compressionDetected = true;
+      }
+
+      if (stype === 'CHECKPOINT' || stype.includes('CHECKPOINT')) {
+        const mu = step.metadata?.modelUsage;
+        if (mu) {
+          const inputTokens = parseInt(String(mu.inputTokens || '0'), 10);
+          if (prevCheckpointInputTokens > 0 && inputTokens < prevCheckpointInputTokens) {
+            const drop = prevCheckpointInputTokens - inputTokens;
+            if (drop > 5000) {
+              compactionCount++;
+              compressionDetected = true;
+            }
+          }
+          if (inputTokens > 0) prevCheckpointInputTokens = inputTokens;
+        }
+      }
+
+      const cTokens = estimateTokensFromText(c);
+      const tTokens = estimateTokensFromText(thinking) + estimateTokensFromText(toolCalls);
+
+      if (stype === 'USER_INPUT') userTok += cTokens;
+      else if (stype === 'GENERIC') toolTok += cTokens;
+      else if (stype === 'PLANNER_RESPONSE') agentTok += cTokens + tTokens;
+      else if (stype === 'CHECKPOINT' || stype === 'SYSTEM_MESSAGE' || src === 'SYSTEM') systemTok += cTokens;
+      else agentTok += cTokens + tTokens;
+    } catch {}
+  }
+  const totalUsed = userTok + agentTok + toolTok + systemTok;
+  return { steps, userTok, agentTok, toolTok, systemTok, totalUsed, compactionCount, compressionDetected, imageGenStepCount };
+}
+
+export function readTranscriptStats(convId, maxSteps = null) {
+  const filePath = findTranscriptPath(convId);
+  if (!filePath) return null;
+  try {
+    const stat = fs.statSync(filePath);
+    const key = `${convId}:${typeof maxSteps === 'number' && maxSteps > 0 ? maxSteps : 'all'}`;
+    const cached = transcriptCache.get(key);
+    if (cached && cached.mtimeMs === stat.mtimeMs && cached.size === stat.size) {
+      return cached.stats;
+    }
+    const content = fs.readFileSync(filePath, 'utf8');
+    const stats = parseTranscriptContent(content, maxSteps);
+    if (stats) {
+      transcriptCache.set(key, { mtimeMs: stat.mtimeMs, size: stat.size, stats });
+    }
+    return stats;
+  } catch {
+    return null;
+  }
+}
+
+export function contextMetrics(metadata, { model = null, sampledAt = null, transcriptStats = null } = {}) {
+  const meta = (metadata && typeof metadata === 'object' && !Array.isArray(metadata)) ? metadata : {};
+  const promptTokens = count(meta.estimatedTokensUsed);
+  const usedTokens = transcriptStats?.totalUsed !== undefined ? count(transcriptStats.totalUsed) : promptTokens;
   if (usedTokens === null) return null;
+  const rawMax = count(meta.maxContextTokens);
   const known = modelContextCapacity(model);
-  const maxTokens = known || (rawMax > 0 ? rawMax : null);
+  const maxTokens = known || (rawMax > 0 ? rawMax : null) || (transcriptStats ? 1048576 : null);
   const compressionLimit = modelCompressionLimit(model) || (rawMax > 0 ? rawMax : null);
   const compressionFraction = compressionLimit ? usedTokens / compressionLimit : null;
   const displayModel = formatModelName(model) || (typeof model === 'string' ? model.slice(0, 256) : null);
+  const compressionDetected = Boolean(transcriptStats?.compressionDetected || (transcriptStats?.compactionCount && transcriptStats.compactionCount > 0));
+  const compactionCount = transcriptStats?.compactionCount || 0;
+  const imageGenStepCount = transcriptStats?.imageGenStepCount || 0;
 
   return {
     usedTokens, maxTokens, remainingTokens: maxTokens === null ? null : Math.max(0, maxTokens - usedTokens),
@@ -74,17 +209,48 @@ export function contextMetrics(metadata, { model = null, sampledAt = null } = {}
     remainingFraction: maxTokens === null ? null : Math.max(0, 1 - usedTokens / maxTokens),
     compressionLimit,
     compressionFraction,
+    compressionDetected,
+    compactionCount,
+    imageGenStepCount,
     model: displayModel,
     sampledAt: typeof sampledAt === 'string' && Number.isFinite(Date.parse(sampledAt)) ? new Date(sampledAt).toISOString() : null,
-    source: 'Antigravity context window metadata', estimated: true,
+    source: transcriptStats ? 'Antigravity session transcript' : 'Antigravity context window metadata',
+    estimated: true,
+    ...(promptTokens !== null ? { promptTokens } : {}),
+    ...(transcriptStats ? {
+      breakdown: {
+        userTokens: transcriptStats.userTok,
+        agentTokens: transcriptStats.agentTok,
+        toolTokens: transcriptStats.toolTok,
+        systemTokens: transcriptStats.systemTok,
+      },
+      transcriptSteps: transcriptStats.steps,
+    } : {}),
   };
 }
 
 export function safeContext(value) {
   if (!value) return null;
-  const base = contextMetrics({ estimatedTokensUsed: value.usedTokens, maxContextTokens: value.maxTokens }, value);
+  const base = contextMetrics({ estimatedTokensUsed: value.promptTokens ?? value.usedTokens, maxContextTokens: value.maxTokens }, value);
   if (!base) return null;
+  if (value.breakdown) base.breakdown = value.breakdown;
+  if (value.transcriptSteps) base.transcriptSteps = value.transcriptSteps;
+  if (value.source) base.source = value.source;
   if (value.compressionLimit !== undefined) base.compressionLimit = value.compressionLimit;
   if (value.compressionFraction !== undefined) base.compressionFraction = value.compressionFraction;
+  if (value.compressionDetected !== undefined) base.compressionDetected = Boolean(value.compressionDetected);
+  if (value.compactionCount !== undefined) base.compactionCount = Number(value.compactionCount) || 0;
+  if (value.imageGenStepCount !== undefined) base.imageGenStepCount = Number(value.imageGenStepCount) || 0;
+  if (value.usedTokens) {
+    base.usedTokens = value.usedTokens;
+    if (base.maxTokens) {
+      base.remainingTokens = Math.max(0, base.maxTokens - base.usedTokens);
+      base.usedFraction = base.usedTokens / base.maxTokens;
+      base.remainingFraction = Math.max(0, 1 - base.usedTokens / base.maxTokens);
+    }
+    if (base.compressionLimit) {
+      base.compressionFraction = base.usedTokens / base.compressionLimit;
+    }
+  }
   return base;
 }
