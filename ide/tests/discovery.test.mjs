@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {selectIdeServer,ideServer,discoverIdeLog,discoverIdeProcesses} from '../discovery.mjs';
+import {selectIdeServer,ideServer,ideRoot,discoverIdeLog,discoverIdeProcesses} from '../discovery.mjs';
 import {validIdeTarget} from '../runtime.mjs';
 import {IdeClient} from '../client.mjs';
 const rows=[
@@ -49,4 +49,40 @@ test('macOS/Linux fixtures keep UID and PID lineage rather than newest process',
 test('IDE client keeps credentials in memory and uses the selected main PID',async()=>{
  const client=new IdeClient({profile:'fixture',debugPort:()=>9000,processes:async()=>({...rows[1],Ports:[8000]}),logPort:async()=>8000});
  assert.deepEqual(await client.discover(),{port:8000,csrf:'test-only',pid:20});
+});
+
+test('inherited sockets never replace the IDE root with its Electron helper or language server',()=>{
+ const helpers=[{ProcessId:70,ParentProcessId:10,Name:'Antigravity IDE.exe',CommandLine:'IDE --type=gpu-process'},
+  {ProcessId:80,ParentProcessId:10,Name:'Antigravity IDE.exe',CommandLine:'IDE --type=utility --utility-sub-type=node.mojom.NodeService'}];
+ for(const order of [[10,20,40,70,80],[80,70,40,20,10]]){
+  const result=selectIdeServer([...rows,...helpers],new Map([[9000,new Set(order)]]),9000);assert.equal(result.rootPid,10);assert.equal(result.ProcessId,20);
+ }
+ assert.throws(()=>selectIdeServer([...rows,...helpers],new Map([[9000,new Set([70,80])]]),9000),/does not belong/);
+ for(const flag of ['--type=renderer','--type gpu-process','"--type=utility"','--utility-sub-type=node.mojom.NodeService'])assert.equal(ideRoot({...rows[0],CommandLine:'IDE '+flag}),false);
+});
+test('multiple real IDE owners fail explicitly rather than selecting the last PID',()=>{
+ for(const ids of [[10,50],[50,10]])assert.throws(()=>selectIdeServer(rows,new Map([[9000,new Set(ids)]]),9000),/Multiple Antigravity IDE/);
+ assert.throws(()=>selectIdeServer(rows,new Map([[9000,new Set([10,50,20,60])]]),9000));
+ for(const port of [0,-1,65536,'9000',NaN])assert.throws(()=>selectIdeServer(rows,new Map(),port),/Invalid/);
+});
+test('Linux shared socket process order, UID isolation and extra IDE instances retain exact lineage',async()=>{
+ for(const reverse of [false,true]){
+  const lines=['10 1 501 /usr/share/antigravity-ide/antigravity-ide',
+   '20 10 501 /app/language_server_linux_x64 --subclient_type ide',
+   '30 10 501 /usr/share/antigravity-ide/antigravity-ide --type=gpu-process',
+   '40 10 501 /usr/share/antigravity-ide/antigravity-ide --type=utility',
+   '50 1 501 /usr/share/antigravity-ide/antigravity-ide',
+   '60 50 501 /app/language_server_linux_x64 --subclient_type ide',
+   '70 1 502 /usr/share/antigravity-ide/antigravity-ide'];
+  const run=async()=>({stdout:(reverse?lines.reverse():lines).join('\n')});
+  const linuxPort=async pid=>pid===50?[9001]:pid===60?[8001]:pid===20?[9000,8000]:[9000];
+  const result=await discoverIdeProcesses(9000,{platform:'linux',uid:501,run,linuxPort});assert.equal(result.rootPid,10);assert.equal(result.ProcessId,20);assert.deepEqual(result.Ports,[9000,8000]);
+  const other=await discoverIdeProcesses(9001,{platform:'linux',uid:501,run,linuxPort});assert.equal(other.ProcessId,60);
+  await assert.rejects(discoverIdeProcesses(9000,{platform:'linux',uid:501,run,linuxPort:async pid=>pid===60?[8001]:[9000]}),/Multiple/);
+ }
+});
+test('macOS lsof duplicate owners are retained; Electron helpers cannot win a shared port',async()=>{
+ const ps='10 1 501 /Applications/Antigravity IDE.app/Contents/MacOS/Antigravity IDE\n20 10 501 /app/language_server_macos_arm64 --subclient_type ide\n30 10 501 /Applications/Antigravity IDE.app/Contents/MacOS/Antigravity IDE --type=gpu-process';
+ const run=async file=>({stdout:file==='/bin/ps'?ps:'p10\nn127.0.0.1:9000\np20\nn127.0.0.1:9000\nn127.0.0.1:8000\np30\nn127.0.0.1:9000'});
+ const result=await discoverIdeProcesses(9000,{platform:'darwin',uid:501,run});assert.equal(result.rootPid,10);assert.equal(result.ProcessId,20);
 });

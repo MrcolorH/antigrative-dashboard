@@ -7,11 +7,17 @@ const exec=promisify(execFile);
 export const ideServer=row=>/^language_server_(?:windows|linux|macos)_(?:x64|arm|arm64)(?:\.exe)?$/i.test(row.Name||'')
   && /(?:^|\s)--subclient_type(?:=|\s+)"?ide(?:"|\s|$)/.test(row.CommandLine||'')
   && !/(?:^|\s)--enable_lsp(?:\s|=|$)/.test(row.CommandLine||'');
+export const ideRoot=row=>/^(?:Antigravity IDE(?:\.exe)?|antigravity-ide)$/i.test(row.Name||'')
+  && !/(?:^|[\s"])--(?:type|utility-sub-type)(?:[=\s"]|$)/i.test(row.CommandLine||'');
 
 export function selectIdeServer(rows,portOwners,debugPort) {
-  const pid=portOwners.get(debugPort);
-  const root=rows.find(r=>r.ProcessId===pid&&/^(?:Antigravity IDE(?:\.exe)?|antigravity-ide)$/i.test(r.Name||''));
-  if(!root)throw Error('IDE renderer port does not belong to Antigravity IDE');
+  if(!Number.isInteger(debugPort)||debugPort<1||debugPort>65535)throw Error('Invalid IDE renderer port');
+  const value=portOwners.get(debugPort);
+  const pids=new Set(value instanceof Set||Array.isArray(value)?value:value===undefined?[]:[value]);
+  const roots=rows.filter(r=>pids.has(r.ProcessId)&&ideRoot(r));
+  if(!roots.length)throw Error('IDE renderer port does not belong to Antigravity IDE');
+  if(roots.length!==1)throw Error('Multiple Antigravity IDE instances own the renderer port');
+  const root=roots[0];
   const candidates=rows.filter(r=>ideServer(r)&&r.ParentProcessId===root.ProcessId);
   if(candidates.length!==1)throw Error('Waiting for the IDE main language server');
   return {...candidates[0],rootPid:root.ProcessId};
@@ -41,7 +47,11 @@ export async function discoverIdeProcesses(debugPort,{platform=process.platform,
     }else if(platform==='linux')ports=new Map(await Promise.all(rows.map(async r=>[r.ProcessId,await linuxPort(r.ProcessId).catch(()=>[])])));
     else throw Error('Unsupported IDE platform');
   }
-  const owners=new Map();for(const [pid,values] of ports)for(const port of values)owners.set(port,pid);
+  const owners=new Map();
+  // /proc and lsof may report the same inherited socket for the root, its
+  // language server and Electron helpers. Keep all owners; never let process
+  // iteration order replace the root or resolve a multi-instance ambiguity.
+  for(const [pid,values] of ports)for(const port of values){if(!owners.has(port))owners.set(port,new Set());owners.get(port).add(pid);}
   const selected=selectIdeServer(rows,owners,debugPort);
   return {...selected,Ports:ports.get(selected.ProcessId)||[]};
 }
