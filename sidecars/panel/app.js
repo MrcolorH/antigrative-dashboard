@@ -113,6 +113,11 @@ function render() {
   $('context-summary').textContent=hasCapacity?t('contextUsed',{used:Math.round(context.usedFraction*100),remaining:Math.round(context.remainingFraction*100)}):t('contextUnknown');
   $('context-tokens').textContent=context?t('contextTokens',{used:compact(context.usedTokens),max:context.maxTokens===null?'—':compact(context.maxTokens)}):'—';
   $('context-model').textContent=context?.model||'—';
+  $('context-host-limit').textContent=context?.maxTokens?`${count(context.maxTokens)} tok`:t('contextLimitUnknown');
+  $('context-provider-row').hidden=!context?.providerCapacityLabel;
+  $('context-provider-limit').textContent=context?.providerCapacityLabel?`${context.providerCapacityLabel} tok`:'—';
+  $('context-provider-limit').title=t('contextReferenceBasis');
+  $('context-compaction-limit').textContent=context?.compressionLimit?`${count(context.compressionLimit)} tok`:t('contextLimitUnknown');
   const restored=context&&(speed.contextRestored===true||speed.restoredFromHistory&&speed.contextRestored!==false);
   $('context-note').textContent=(context?t('contextBasis'):t('contextUnavailable'))+(restored?' '+t('contextSaved',{time:speed.savedAt?language.resetDate(speed.savedAt):'—'}):'')+(hasCapacity&&context.usedFraction>1?' '+t('contextExceeded'):'');
   $('context-fill').style.width=hasCapacity?`${Math.min(1,context.usedFraction)*100}%`:'0%';
