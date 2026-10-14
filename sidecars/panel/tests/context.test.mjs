@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { mkdtemp, readFile, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { contextMetrics } from '../context.mjs';
+import { contextMetrics, formatModelName, modelContextCapacity, modelCompressionLimit } from '../context.mjs';
 import { trajectoryMetrics } from '../metrics.mjs';
 import { SessionHistory, safeMetrics } from '../history.mjs';
 import { MetricsStore } from '../store.mjs';
@@ -58,4 +58,35 @@ test('live lower context updates even when cumulative TPS history is protected',
   await store.session(id,true);n=1;used=20;
   const current=await store.session(id,true);
   assert.equal(current.requests,3);assert.equal(current.context.usedFraction,.2);assert.equal(current.contextRestored,false);
+});
+
+test('known models resolve canonical capacity over host fallback ceiling (e.g. Gemini 1M)', () => {
+  assert.equal(modelContextCapacity('gemini-3.8-flash-n'), 1048576);
+  assert.equal(modelContextCapacity('Gemini 3.8 Flash (High)'), 1048576);
+  assert.equal(modelContextCapacity('Claude Sonnet 5.5 (Thinking)'), 1048576);
+  assert.equal(modelContextCapacity('Claude Sonnet 4.6 (Thinking)'), 200000);
+  assert.equal(modelContextCapacity('GPT-OSS 120B (Medium)'), 131072);
+  assert.equal(modelContextCapacity('unknown-model'), null);
+
+  assert.equal(modelCompressionLimit('gemini-3.8-flash-n'), 256000);
+  assert.equal(modelCompressionLimit('MODEL_PLACEHOLDER_M318'), 256000);
+  assert.equal(modelCompressionLimit('claude-sonnet-5.5'), 256000);
+  assert.equal(modelCompressionLimit('claude-sonnet-4-6'), 160000);
+  assert.equal(modelCompressionLimit('gpt-oss-120b'), 80000);
+
+  assert.equal(formatModelName('gemini-3.8-flash-n'), 'Gemini 3.8 Flash');
+  assert.equal(formatModelName('MODEL_PLACEHOLDER_M318'), 'Gemini 3.8 Flash (High)');
+  assert.equal(formatModelName('MODEL_PLACEHOLDER_M319'), 'Gemini 3.8 Flash (Medium)');
+  assert.equal(formatModelName('MODEL_PLACEHOLDER_M317'), 'Gemini 3.8 Flash (Low)');
+
+  const result = contextMetrics(
+    { estimatedTokensUsed: 128000, maxContextTokens: 256000 },
+    { model: 'gemini-3.8-flash-n' }
+  );
+  assert.equal(result.usedTokens, 128000);
+  assert.equal(result.maxTokens, 1048576); // 1M native capacity overrides 256K host ceiling
+  assert.equal(result.compressionLimit, 256000);
+  assert.equal(result.usedFraction, 128000 / 1048576);
+  assert.equal(result.compressionFraction, 128000 / 256000);
+  assert.equal(result.model, 'Gemini 3.8 Flash');
 });
