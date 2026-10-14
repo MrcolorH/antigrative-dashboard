@@ -525,7 +525,7 @@ module.exports = function installAgPulseInlineWidget() {
       <dl>${[['modelTime','model-time'],['toolTime','tool-time'],['ttft','ttft'],['sessionTps','session-rate'],['latest','latest-rate'],['tokens','tokens']].map(([key,id])=>`<div><dt data-i18n="${key}">${t(key)}</dt><dd id="${id}">—</dd></div>`).join('')}</dl><p class="footnote" id="rate-note">${t('responseBasis')}</p>
     </section><section class="card" id="cache-card" role="region" data-i18n-aria="cacheTitle" aria-label="Token cache" hidden>
       <div class="heading"><span>${svg('cache')}<span data-i18n="cacheTitle">Token cache</span></span><span class="tag" id="cache-coverage">—</span></div>
-      <dl>${[['cacheRate','cache-detail-rate'],['cacheMiss','cache-miss'],['cacheRead','cache-read'],['cacheOutput','cache-output'],['cacheWrite','cache-write']].map(([key,id])=>`<div ${id==='cache-write'?'id="cache-write-row" hidden':''}><dt data-i18n="${key}">${t(key)}</dt><dd id="${id}">—</dd></div>`).join('')}</dl><p class="footnote" id="cache-note">${t('cacheBasis')}</p>
+      <dl>${[['cacheRate','cache-detail-rate'],['cacheMiss','cache-miss'],['cacheRead','cache-read'],['cacheOutput','cache-output'],['cacheWrite','cache-write']].map(([key,id])=>`<div ${id==='cache-write'?'id="cache-write-row" hidden':''}><dt data-i18n="${key}">${t(key)}</dt><dd id="${id}">—</dd></div>`).join('')}</dl><p class="footnote" id="cache-note" hidden></p>
     </section><section class="card context-card" id="context-card" role="region" data-i18n-aria="context" hidden>
       <div class="heading"><span>${svg('context')}<span data-i18n="context">Context window</span></span></div>
       <strong id="context-summary">—</strong><p id="context-tokens">—</p>
@@ -656,25 +656,18 @@ module.exports = function installAgPulseInlineWidget() {
     const cache=speed?.cache;
     text('cache-rate',pct(cache?.hitRate));text('cache-detail-rate',pct(cache?.hitRate));
     const tokens=speed?.tokens || cache;
-    const partial=tokens?.measuredRequests&&tokens.complete===false;
-    const prefix=partial?'≥ ':'';
+    // Keep coverage in the data model; the compact card shows readable counters.
     const hasTotal=tokens?.measuredRequests&&Number.isSafeInteger(tokens.totalTokens)&&tokens.totalTokens>=0;
-    text('cache-total',hasTotal?`${prefix}${compact(tokens.totalTokens)} tok`:'— tok');
-    text('cache-coverage',hasTotal?`${prefix}${count(tokens.totalTokens)} tok`:'— tok');
+    text('cache-total',hasTotal?`${compact(tokens.totalTokens)} tok`:'— tok');
+    text('cache-coverage',hasTotal?`${count(tokens.totalTokens)} tok`:'— tok');
     const inputCoverage={uncachedTokens:'uncachedRequests',cachedTokens:'cachedRequests',cacheWriteTokens:'cacheWriteRequests'};
     for(const [field,id]of[['cachedTokens','cache-read'],['uncachedTokens','cache-miss'],['cacheWriteTokens','cache-write'],['outputTokens','cache-output']]) {
       const available=field==='outputTokens'?(tokens?.outputAvailable??(tokens?.outputRequests??tokens?.measuredRequests)):(tokens?.[inputCoverage[field]]??tokens?.inputRequests??tokens?.measuredRequests);
-      const missing=field==='outputTokens'?tokens?.missingOutputRequests||tokens?.coverageUnknown:
-        (tokens?.[inputCoverage[field]]!=null?tokens[inputCoverage[field]]<(speed?.requests||0):tokens?.missingInputRequests);
       const known=Number.isSafeInteger(tokens?.[field])&&tokens[field]>=0;
-      text(id,available&&known?`${missing?'≥ ':''}${count(tokens[field])} tok`:'—');
+      text(id,available&&known?`${count(tokens[field])} tok`:'—');
     }
     hidden($('cache-write-row'),!(tokens?.cacheWriteTokens>0));
-    const cacheSaved=speed?.cacheRestoredFromHistory?' '+t('savedCache',{time:speed.cacheSavedAt?language.resetDate(speed.cacheSavedAt):'—'}):'';
-    const tokenPartial=partial&&speed?.tokens?' '+(tokens.coverageUnknown?t('tokenLegacy'):t('tokenPartial',{input:tokens.missingInputRequests??t('unknownCoverage'),output:tokens.missingOutputRequests??t('unknownCoverage')})):'';
-    const coverage=cache?.missingRequests?' '+(speed?.tokens?t('cacheCoverage',{measured:cache.measuredRequests,total:cache.measuredRequests+cache.missingRequests}):t('cacheMissing',{n:cache.missingRequests})):'';
-    const zeroInput=cache?.measuredRequests&&cache.inputTokens===0?' '+t('cacheZeroInput'):'';
-    text('cache-note',(cache?.measuredRequests?t('cacheBasis')+coverage+zeroInput:t(empty?'newConversationStats':'cacheUnavailable'))+tokenPartial+cacheSaved+savedNote+saveWarning);
+    hidden($('cache-note'),true);
     for(const [window,name]of[['5h','five'],['weekly','week']]){
       const b=group?.windows?.[window];text(name,pct(b?.remaining));text(`${name}-balance`,pct(b?.remaining));text(`${name}-reset`,date(b?.resetAt));
       style($(`${name}-fill`),'width',typeof b?.remaining==='number'?`${b.remaining*100}%`:'0%');style($(`${name}-fill`),'background',b?.remaining<.05?'var(--pulse-danger)':b?.remaining<.2?'var(--pulse-warning)':'');

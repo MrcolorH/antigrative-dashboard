@@ -130,25 +130,18 @@ function render() {
   if(hasCapacity){$('context-track').setAttribute('aria-valuenow',String(Math.min(100,context.usedFraction*100)));$('context-track').setAttribute('aria-valuemin','0');$('context-track').setAttribute('aria-valuemax','100');}else $('context-track').removeAttribute('aria-valuenow');
   $('strip-cache').textContent=percent(cache?.hitRate);$('cache-rate').textContent=percent(cache?.hitRate);
   const tokens=speed?.tokens || cache;
-  const partial=tokens?.measuredRequests&&tokens.complete===false;
-  const prefix=partial?'≥ ':'';
+  // Coverage remains available in raw statistics and documented separately.
   const hasTotal=tokens?.measuredRequests&&Number.isSafeInteger(tokens.totalTokens)&&tokens.totalTokens>=0;
-  $('strip-cache-total').textContent=hasTotal?`${prefix}${compact(tokens.totalTokens)} tok`:'— tok';
+  $('strip-cache-total').textContent=hasTotal?`${compact(tokens.totalTokens)} tok`:'— tok';
   const inputCoverage={uncachedTokens:'uncachedRequests',cachedTokens:'cachedRequests',cacheWriteTokens:'cacheWriteRequests'};
   for(const [field,id]of[['cachedTokens','cache-read'],['uncachedTokens','cache-miss'],['cacheWriteTokens','cache-write'],['outputTokens','cache-output']]) {
     const available=field==='outputTokens'?(tokens?.outputAvailable??(tokens?.outputRequests??tokens?.measuredRequests)):(tokens?.[inputCoverage[field]]??tokens?.inputRequests??tokens?.measuredRequests);
-    const missing=field==='outputTokens'?tokens?.missingOutputRequests||tokens?.coverageUnknown:
-      (tokens?.[inputCoverage[field]]!=null?tokens[inputCoverage[field]]<(speed?.requests||0):tokens?.missingInputRequests);
     const known=Number.isSafeInteger(tokens?.[field])&&tokens[field]>=0;
-    $(id).textContent=available&&known?`${missing?'≥ ':''}${count(tokens[field])} tok`:'—';
+    $(id).textContent=available&&known?`${count(tokens[field])} tok`:'—';
   }
-  $('cache-coverage').textContent=hasTotal?`${prefix}${count(tokens.totalTokens)} tok`:'— tok';
+  $('cache-coverage').textContent=hasTotal?`${count(tokens.totalTokens)} tok`:'— tok';
   $('cache-write-row').hidden=!(tokens?.cacheWriteTokens>0);
-  const cacheSaved=speed?.cacheRestoredFromHistory?' '+t('savedCache',{time:speed.cacheSavedAt?language.resetDate(speed.cacheSavedAt):'—'}):'';
-  const tokenPartial=partial&&speed?.tokens?' '+(tokens.coverageUnknown?t('tokenLegacy'):t('tokenPartial',{input:tokens.missingInputRequests??t('unknownCoverage'),output:tokens.missingOutputRequests??t('unknownCoverage')})):'';
-  const coverage=cache?.missingRequests?' '+(speed?.tokens?t('cacheCoverage',{measured:cache.measuredRequests,total:cache.measuredRequests+cache.missingRequests}):t('cacheMissing',{n:cache.missingRequests})):'';
-  const zeroInput=cache?.measuredRequests&&cache.inputTokens===0?' '+t('cacheZeroInput'):'';
-  $('cache-note').textContent=(cache?.measuredRequests?t('cacheBasis')+coverage+zeroInput:t('cacheUnavailable'))+tokenPartial+cacheSaved+savedNote+saveWarning;
+  $('cache-note').hidden=true;
   $('connection-dot').className = `connection-dot ${snapshot.connection}`;
   $('connection-dot').title = t(snapshot.connection === 'live'?'live':snapshot.connection === 'stale'?'stale':'offline');
   const timestamp = snapshot.quotaUpdatedAt ? new Date(snapshot.quotaUpdatedAt).toLocaleTimeString(language.language,{hour12:false}) : null;

@@ -1,5 +1,11 @@
 # Changelog
 
+## Unreleased — compact token card
+
+- Remove repeated inequality prefixes, calculation prose and coverage-count paragraphs from the token/cache card and inline strip.
+- Keep independently measured token counters, missing-value dashes, zero-input cache semantics and conservative coverage flags unchanged. Document the partial-data limits in the README rather than expanding the compact card.
+
+
 ## Unreleased — PR #15 follow-up
 
 - Preserve host-based context occupancy and the validated PR #14 capacity/reference semantics.
