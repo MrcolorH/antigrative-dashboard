@@ -18,6 +18,8 @@ jobs:
         with:
           python-version: '3.11'
       - run: npm test
+      - name: Stream an optional transcript without retaining its text
+        run: node --expose-gc tools/check-transcript-resources.mjs
       - name: Stream a synthetic corpus above the former 512 MiB cap
         run: node --expose-gc tools/check-trajectory-resources.mjs 640 1024
       - name: Reject over-budget projected statistics without partial cache

@@ -12,11 +12,11 @@ const schema={trajectory:{cascadeId:scalar,trajectoryId:scalar,steps,generatorMe
  generatorMetadata:generators,generatorMetadatas:generators,status:scalar,numTotalSteps:scalar,numTotalGeneratorMetadata:scalar};
 const DROP=Symbol('discard');
 export class TrajectoryJson {
- constructor({maxRetainedBytes=8*1024*1024}={}){this.maxRetainedBytes=maxRetainedBytes;}
+ constructor({maxRetainedBytes=8*1024*1024,projection=schema}={}){this.maxRetainedBytes=maxRetainedBytes;this.projection=projection;}
  stack=[];token=null;result=undefined;done=false;retained=0;
  fail(){throw new Error('Antigravity 接口返回了无法解析的数据');}
  charge(n){if((this.retained+=n)>this.maxRetainedBytes)throw new Error('会话统计数据超过采集上限');}
- node(){const f=this.stack.at(-1);if(!f)return schema;const key=f.array?'*':f.key;return f.node&&typeof f.node==='object'&&Object.hasOwn(f.node,key)?f.node[key]:undefined;}
+ node(){const f=this.stack.at(-1);if(!f)return this.projection;const key=f.array?'*':f.key;return f.node&&typeof f.node==='object'&&Object.hasOwn(f.node,key)?f.node[key]:undefined;}
  valueAllowed(){const f=this.stack.at(-1);return f?['value','valueOrEnd'].includes(f.expect):!this.done;}
  finishValue(value){
   const f=this.stack.at(-1);
@@ -44,10 +44,14 @@ export class TrajectoryJson {
   const f=this.stack.at(-1),key=f&&!f.array&&['key','keyOrEnd'].includes(f.expect);
   if(!key&&!this.valueAllowed())this.fail();
   const node=key?null:this.node();
-  this.token={kind:'string',key,node,buffer:'',overflow:false,escape:0,hex:'',any:false};
+  this.token={kind:'string',key,node,buffer:'',overflow:false,escape:0,hex:'',any:false,ascii:0,other:0};
  }
  stringPart(text){
   const t=this.token;if(t.node===nonempty&&/\S/u.test(text)||t.node===presence&&text.length)t.any=true;
+  if(t.node==='textEstimate'){
+   const other=(text.match(/[^\x00-\x7f]/g)||[]).length;t.ascii+=text.length-other;t.other+=other;
+   if(t.buffer.length<256)t.buffer+=text.slice(0,256-t.buffer.length);
+  }
   if(t.key||t.node===scalar||typeof t.node==='object'){
    if(t.overflow)return;t.buffer+=text;
    if(t.buffer.length>(t.key?1024:16384)){if(!t.key)throw new Error('会话统计字段超过采集上限');t.buffer='';t.overflow=true;}
@@ -58,6 +62,7 @@ export class TrajectoryJson {
   if(t.key){const f=this.stack.at(-1);f.key=t.overflow?null:t.buffer;f.expect='colon';return;}
   let value=DROP;
   if(t.node===nonempty)value=t.any?'1':'';
+  else if(t.node==='textEstimate')value={tokens:Math.ceil(t.ascii/4+t.other/1.5),prefix:t.buffer};
   else if(t.node===presence)value=t.any;
   else if(t.node===scalar||typeof t.node==='object'){value=t.buffer;this.charge(value.length*2);}
   this.finishValue(value);

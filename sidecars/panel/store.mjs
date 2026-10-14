@@ -2,10 +2,11 @@ import { createHash } from 'node:crypto';
 import { AntigravityClient } from './client.mjs';
 import { quotaMetrics, trajectoryMetrics } from './metrics.mjs';
 import { SessionHistory, usableMetrics, reconcileMetrics } from './history.mjs';
+import { TranscriptReader } from './transcript.mjs';
 
 const GUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 export class MetricsStore {
-  constructor(client = new AntigravityClient(), { history = new SessionHistory(), onTrajectory = null } = {}) { this.client = client; this.history = history; this.onTrajectory=onTrajectory; }
+  constructor(client = new AntigravityClient(), { history = new SessionHistory(), onTrajectory = null, transcripts = new TranscriptReader() } = {}) { this.client = client; this.history = history; this.onTrajectory=onTrajectory; this.transcripts=transcripts; }
   quota = null;
   quotaAt = 0;
   quotaPending = null;
@@ -21,12 +22,12 @@ export class MetricsStore {
     if (!GUID.test(id) || !this.identity) return null;
     const scope = this.identity, epoch = this.epoch;
     const entry = this.sessions.get(id);
-    if (usableMetrics(entry?.data)) return { ...entry.data, restoredFromHistory: true, savedAt: entry.savedAt || null };
+    if (usableMetrics(entry?.data)) return { ...entry.data, transcriptRestoredFromHistory:!!entry.data.transcriptStats, restoredFromHistory: true, savedAt: entry.savedAt || null };
     const saved = await this.history.load(scope,id);
     if (scope !== this.identity || epoch !== this.epoch) return null;
     if (!saved) return null;
     if (!this.sessions.has(id)) this.sessions.set(id,{data:saved.metrics,savedAt:saved.savedAt,updatedAt:0});
-    return {...saved.metrics,restoredFromHistory:true,savedAt:saved.savedAt};
+    return {...saved.metrics,transcriptRestoredFromHistory:!!saved.metrics.transcriptStats,restoredFromHistory:true,savedAt:saved.savedAt};
   }
 
   async refreshQuota(force = false) {
@@ -38,7 +39,7 @@ export class MetricsStore {
       if (epoch !== this.epoch) throw new Error('后台已重新连接，请等待刷新');
       const email = user.userStatus?.email;
       const identity = email ? createHash('sha256').update(email).digest('hex') : null;
-      if (identity !== this.identity) { this.client.resetTrajectories?.(); this.quota = null; this.quotaAt = 0; this.sessions.clear(); this.summaries = []; this.summariesAt = 0; }
+      if (identity !== this.identity) { this.transcripts?.reset(); this.client.resetTrajectories?.(); this.quota = null; this.quotaAt = 0; this.sessions.clear(); this.summaries = []; this.summariesAt = 0; }
       this.identity = identity;
       const response = await this.client.call('RetrieveUserQuotaSummary');
       if (epoch !== this.epoch || identity !== this.identity) throw new Error('后台已重新连接，请等待刷新');
@@ -80,13 +81,15 @@ export class MetricsStore {
       if(this.onTrajectory&&scope){try{await this.onTrajectory(scope,id,raw);if(current())this.usagePersistenceError=false;}catch{if(current())this.usagePersistenceError=true;}}
       if (!current()) throw new Error('后台已重新连接，请等待刷新');
       const fresh = trajectoryMetrics(raw);
+      // Optional background I/O cannot delay or fail the core metrics request.
+      try { if(scope&&this.transcripts)fresh.transcriptStats=this.transcripts.request(scope,id,raw); } catch {}
       entry.data = {...reconcileMetrics(entry.data,fresh,entry.savedAt || null),conversationId:id}; entry.updatedAt = Date.now();
       try { const saved = await this.history.save(scope,id,entry.data); if (saved) entry.savedAt = saved.savedAt; if (current()) this.persistenceError = null; }
       catch { this.persistenceError = '统计暂时无法保存到本地'; }
       if (!current()) throw new Error('后台已重新连接，请等待刷新');
       return entry.data;
     })().catch(error => {
-      if (current() && usableMetrics(entry.data)) { entry.updatedAt = Date.now(); entry.data = {...entry.data,restoredFromHistory:true,savedAt:entry.savedAt || null}; return entry.data; }
+      if (current() && usableMetrics(entry.data)) { entry.updatedAt = Date.now(); entry.data = {...entry.data,transcriptRestoredFromHistory:!!entry.data.transcriptStats,restoredFromHistory:true,savedAt:entry.savedAt || null}; return entry.data; }
       throw error;
     }).finally(() => { entry.pending = null; });
     return entry.pending;
@@ -97,7 +100,7 @@ export class MetricsStore {
     try {
       const server = await this.client.discover();
       if (server.pid !== this.serverPid) {
-        this.epoch++; this.quota = null; this.quotaAt = 0; this.sessions.clear(); this.identity = null; this.summaries = []; this.summariesAt = 0; this.serverPid = server.pid;
+        this.epoch++; this.transcripts?.reset(); this.quota = null; this.quotaAt = 0; this.sessions.clear(); this.identity = null; this.summaries = []; this.summariesAt = 0; this.serverPid = server.pid;
       }
       try { await this.refreshQuota(force); }
       catch (e) { connection = this.quota ? 'stale' : 'offline'; error = e.message; }

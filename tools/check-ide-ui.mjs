@@ -16,7 +16,7 @@ const box=document.getElementById('antigravity.agentSidePanelInputBox'),panel=do
 const owner={props:{cascadeId:${JSON.stringify(id)}},__k:[]},vnode={type:'div',__e:box,props:{id:box.id},__:owner,__k:[]};owner.__k=[vnode];panel.__k=owner;
 window.testOwner=owner;window.metricsRequests=[];window.testTps=166.6;window.testQuality=null;window.testPreferences={language:'en',languageGuideDismissed:true,revision:1};
 const windows={'5h':{remaining:.8,available:true,resetAt:new Date(Date.now()+3600000).toISOString()},weekly:{remaining:.6,available:true,resetAt:new Date(Date.now()+86400000).toISOString()}};
-window.agPulseHost={getPreferences:async()=>testPreferences,setPreferences:async input=>(testPreferences={...testPreferences,...input,revision:testPreferences.revision+1}),getMetrics:async input=>{metricsRequests.push(input.conversationId);return {connection:'live',preferences:testPreferences,groups:[{id:'gemini',name:'Gemini',windows},{id:'3p',name:'Claude / GPT',windows}],quotaUpdatedAt:'2026-10-10T00:00:00Z',speed:input.conversationId?{conversationId:input.conversationId,tps:testTps,rounds:2,steps:7,counts:{responseOutput:6000,thinkingOutput:2000},cache:{hitRate:.45,totalTokens:53000,measuredRequests:2},context:{usedFraction:.14,remainingFraction:.86,usedTokens:140000,maxTokens:1000000,model:'Gemini'}}:null};}};
+window.agPulseHost={getPreferences:async()=>testPreferences,setPreferences:async input=>(testPreferences={...testPreferences,...input,revision:testPreferences.revision+1}),getMetrics:async input=>{metricsRequests.push(input.conversationId);return {connection:'live',preferences:testPreferences,groups:[{id:'gemini',name:'Gemini',windows},{id:'3p',name:'Claude / GPT',windows}],quotaUpdatedAt:'2026-10-10T00:00:00Z',speed:input.conversationId?{conversationId:input.conversationId,tps:testTps,rounds:2,steps:7,counts:{responseOutput:6000,thinkingOutput:2000},transcriptStats:{version:1,status:'partial',complete:false,userTokens:100,assistantTokens:200,toolTokens:50,systemTokens:10,totalTokens:360,matchedSteps:4,compactionMarkers:1,imageSteps:0},cache:{hitRate:.45,totalTokens:53000,measuredRequests:2},context:{usedFraction:.14,remainingFraction:.86,usedTokens:140000,maxTokens:1000000,model:'Gemini'}}:null};}};
 window.__agPulseSurface=(${extract(sources[3])})();window.__agPulseI18nFactory=(${extract(sources[0])});window.__agPulseThemeFactory=(${extract(sources[1])});(${extract(sources[2])})();
 </script></body></html>`;
 const server=createServer((req,res)=>{res.setHeader('Content-Type','text/html;charset=utf-8');res.end(html);});server.listen(0,'127.0.0.1');await new Promise(r=>server.once('listening',r));
@@ -30,6 +30,7 @@ const state=()=>page.evaluate(()=>{
 });
 try{
  await page.goto(`http://127.0.0.1:${server.address().port}`);await page.waitForTimeout(1300);
+ assert.deepEqual(errors,[],'IDE template must work under the host Trusted Types policy');
  let narrow=await state();assert.equal(narrow.id,id);assert.equal(narrow.density,'icons');assert.equal(narrow.layout,'ready');assert.equal(narrow.tps,'166.6');assert.equal(narrow.modelTruncated,false);assert.equal(narrow.icons.filter(e=>!e.hidden&&e.width===24).length,3);
  for(const card of ['speed','cache','context']){await page.locator(`[data-card=${card}]`).click();await page.waitForTimeout(150);assert.ok(await page.locator(`#${card}-card`).isVisible());await page.keyboard.press('Escape');}
  await page.setViewportSize({width:960,height:800});await page.waitForTimeout(400);let wide=await state();assert.equal(wide.density,'full');assert.equal(wide.layout,'ready');assert.equal(wide.modelTruncated,false);
@@ -39,6 +40,9 @@ try{
  // Keep a constrained, scrolled card open across multiple real polling ticks.
  // Identical preferences must not replace its labels or oscillate maxHeight.
  await page.locator('[data-card=context]').click();
+ assert.equal(await page.locator('#transcript-total').textContent(),'360 tok · partial');
+ await page.locator('#transcript-details summary').click();assert.equal(await page.locator('#transcript-user').textContent(),'100');assert.equal(await page.locator('#transcript-markers').textContent(),'1');
+ await page.locator('#transcript-details summary').click();
  const stable=await page.evaluate(async()=>{
    const root=document.getElementById('ag-pulse-status-bar').shadowRoot,card=root.getElementById('context-card');
    card.scrollTop=80;const scroll=card.scrollTop,rect=card.getBoundingClientRect().toJSON(),requests=metricsRequests.length;
@@ -62,7 +66,7 @@ try{
  await page.evaluate(()=>{testQuality=null;});
  await page.waitForFunction(()=>document.getElementById('ag-pulse-status-bar').shadowRoot.getElementById('tps').textContent==='200.0');
  await page.keyboard.press('Escape');
- await page.locator('[data-card=context]').click();await page.locator('#card-language-zh').click();await page.waitForTimeout(150);assert.equal((await state()).lang,'zh-CN');await page.keyboard.press('Escape');
+ await page.locator('[data-card=context]').click();await page.locator('#card-language-zh').click();await page.waitForTimeout(150);assert.equal((await state()).lang,'zh-CN');assert.equal(await page.locator('#transcript-total').textContent(),'360 tok · 不完整');await page.keyboard.press('Escape');
  await page.evaluate(quality=>{testQuality=quality;},quality);
  await page.waitForFunction(()=>document.getElementById('ag-pulse-status-bar').shadowRoot.getElementById('latest-rate').textContent==='计时异常');
  await page.locator('[data-card=speed]').click();assert.equal(await page.locator('#rate-note').textContent(),'统计方式：正文 Token ÷ 流式时长；会话 TPS 按总时长加权。');

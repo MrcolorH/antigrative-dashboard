@@ -3,6 +3,7 @@ import { join } from 'node:path';
 import { homedir } from 'node:os';
 import { randomUUID } from 'node:crypto';
 import { safeContext } from './context.mjs';
+import { safeTranscriptStats } from './transcript.mjs';
 import { RATE_VERSION, RATE_REASONS } from './rate-quality.mjs';
 
 const GUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -73,6 +74,10 @@ export function safeMetrics(value, conversationId) {
   result.model = typeof value.model === 'string' ? value.model.slice(0,256) : null;
   result.status = typeof value.status === 'string' && /^[A-Z0-9_]+$/.test(value.status) ? value.status : null;
   result.context = safeContext(value.context) || null;
+  const transcript=safeTranscriptStats(value.transcriptStats);
+  // Transient loading/I/O status must not churn history timestamps or revive
+  // a prior estimate. Persist only a measured numeric snapshot.
+  if(transcript&&['ready','partial'].includes(transcript.status)&&(transcript.matchedSteps>0||transcript.complete))result.transcriptStats=transcript;
   result.rateVersion = value.rateVersion === RATE_VERSION ? RATE_VERSION : 0;
   result.timingReasons = Object.fromEntries(RATE_REASONS.map(key=>[key,number(value.timingReasons?.[key]) ? value.timingReasons[key] : 0]));
   result.latestRateStatus = ['ok','missing','unreliable'].includes(value.latestRateStatus) ? value.latestRateStatus : 'missing';
@@ -100,9 +105,9 @@ export function shouldKeepSaved(saved, fresh) {
 }
 
 export function reconcileMetrics(saved, fresh, savedAt = null) {
-  if (shouldKeepSaved(saved,fresh)) return {...saved,context:fresh.context || null,contextRestored:false,
+  if (shouldKeepSaved(saved,fresh)) return {...saved,transcriptStats:fresh.transcriptStats||null,transcriptRestoredFromHistory:false,context:fresh.context || null,contextRestored:false,
     restoredFromHistory:true,savedAt};
-  const result = {...fresh,contextRestored:false,restoredFromHistory:false,
+  const result = {...fresh,contextRestored:false,transcriptRestoredFromHistory:false,restoredFromHistory:false,
     speedRestoredFromHistory:fresh.speedRestoredFromHistory===true,
     cacheRestoredFromHistory:fresh.cacheRestoredFromHistory===true};
   if (!usableMetrics(saved)) return result;
@@ -153,7 +158,7 @@ export class SessionHistory {
     if (previous && shouldKeepSaved(previous.metrics,metrics)) {
       // Regression guards protect cumulative TPS/cache. A valid current context
       // can shrink after compaction; it must still replace the prior snapshot.
-      if (!metrics.context) return previous;
+      if (!metrics.context&&!Object.hasOwn(value,'transcriptStats')) return previous;
       metrics = reconcileMetrics(previous.metrics,metrics,previous.savedAt);
     } else if (previous) {
       metrics = reconcileMetrics(previous.metrics,metrics,previous.savedAt);

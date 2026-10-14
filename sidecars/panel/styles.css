@@ -40,3 +40,5 @@ dl{margin:0}dl>div{display:flex;justify-content:space-between;align-items:baseli
 @media(max-width:360px){.widget{width:calc(100% - 16px);margin:8px}.metric-chip{padding-inline:7px}.chip-primary strong{font-size:20px}.metric-label{gap:3px;font-size:9px}.metric-label .icon{width:10px}.quota-mini{padding-inline:8px}select{width:76px}}
 @media(max-width:300px){.chip-primary strong{font-size:18px}.quota-mini p{flex-wrap:wrap;gap:1px}.metric-label .icon{display:none}.quota-overview{gap:6px}}
 @media(prefers-reduced-motion:reduce){.icon-button,.metric-chip{transition:none}#refresh-button[aria-busy=true] .icon{animation:none;opacity:.65}}
+
+#transcript-details{margin-top:12px;border-top:1px solid var(--pulse-separator);padding-top:10px}#transcript-details summary{cursor:pointer;font-size:11px;color:var(--pulse-label)}#transcript-total{float:right;margin-left:8px;font-variant-numeric:tabular-nums;color:var(--pulse-foreground);font-size:10px}
