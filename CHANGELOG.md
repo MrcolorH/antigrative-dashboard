@@ -1,5 +1,10 @@
 # Changelog
 
+## Unreleased — compact context card
+
+- Focus the context card on host occupancy, used/total tokens, sampled model and shared quota/reset controls, with language switching retained at the bottom.
+- Remove duplicate capacity rows, unknown compaction thresholds, logged-text diagnostic breakdowns and routine explanatory paragraphs from the compact UI. Preserve the host denominator and conservative diagnostic data, with detailed sources/limits documented separately.
+
 ## Unreleased — compact token card
 
 - Remove repeated inequality prefixes, calculation prose and coverage-count paragraphs from the token/cache card and inline strip.

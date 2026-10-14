@@ -209,7 +209,7 @@ These are conservative checks on host timing summaries, not proof of buffering. 
 
 ## Saved conversation statistics
 
-Context occupancy uses the current request's host-reported window. The details show provider capacity references separately; an unverified compaction threshold remains **Unknown**. Provider specifications never replace a valid host denominator. See [context limits and sources](docs/CONTEXT_LIMITS.md). App/IDE details also offer a collapsible **Recorded text estimate**, grouped by user, replies/thinking, tool output and system text. It uses bounded local-log reads and filters undone/stale steps; these heuristic counts and recorded compaction markers are separate from active context and billed usage.
+Context occupancy uses the current request's host-reported window. The compact context card shows occupancy, used/total tokens, sampled model and both quota windows with reset times. Duplicate capacity references, unknown compaction fields, diagnostic text estimates and calculation paragraphs stay out of the card. The collector still keeps separate sourced references and conservative optional transcript diagnostics; neither changes the host denominator or billed usage. See [context limits and sources](docs/CONTEXT_LIMITS.md).
 
 Completed-request TPS, cache counts and whitelisted context estimates are saved automatically in `~/.gemini/antigravity/sidecar_data/antigravity-pulse/panel/data/history-v1/<account-hash>/<conversation-id>.json`. Reloading, restarting, updating or reinstalling the plugin preserves them. Empty or regressing backend data cannot erase a useful saved sample. Saved fallbacks show their saved time in the details. A real 0% cache hit remains 0%.
 

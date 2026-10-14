@@ -57,14 +57,8 @@ try{
   // active 100K host window / 20% occupancy in either language.
   await view.locator('#strip-tps').waitFor();
   await view.locator('#strip-context').filter({hasText:'20%'}).waitFor();
-  assert.equal(await view.locator('#context-host-limit').textContent(),'100,000 tok');
-  assert.equal(await view.locator('#context-provider-limit').textContent(),'1,048,576 tok');
-  assert.equal(await view.locator('#context-compaction-limit').textContent(),'Unknown');
-  assert.equal(await view.locator('#transcript-total').textContent(),'360 tok');
-  await view.locator('#context-tab').click();await view.locator('#transcript-details summary').click();
-  assert.equal(await view.locator('#transcript-user').textContent(),'100');assert.equal(await view.locator('#transcript-markers').textContent(),'1');
-  assert.equal(await view.locator('#transcript-details summary span').first().textContent(),'Recorded text estimate');
-  await view.locator('#speed-tab').click();
+  assert.equal(await view.locator('#context-tokens').textContent(),'20K / 100K tok');
+  assert.equal(await view.locator('#context-provider-limit,#context-compaction-limit,#context-host-limit,#context-note,#transcript-details').count(),0,'Compact context omits duplicate capacities and diagnostic prose');
   await view.locator('#strip-tps').filter({hasText:'38.7'}).waitFor();
   assert.deepEqual(await view.locator('.metric-label span').allTextContents(),['Speed','Cache','Context']);
   assert.ok(await view.locator('#strip-tps').evaluate(e=>parseFloat(getComputedStyle(e).fontSize))>=18);
@@ -87,9 +81,7 @@ try{
    assert.equal(await view.locator('body').evaluate(e=>getComputedStyle(e).backgroundColor===getComputedStyle(document.querySelector('.widget')).backgroundColor),true,'SDK inline body background follows the dashboard theme');
   }
   await view.locator('#language-toggle').click();await view.locator('#language-toggle').filter({hasText:'中'}).waitFor();
-  assert.equal(await view.locator('#context-compaction-limit').textContent(),'未知');
-  assert.equal(await view.locator('#transcript-details summary span').first().textContent(),'已记录文本估算');
-  assert.equal(await view.locator('#context-host-limit').textContent(),'100,000 tok');
+  assert.equal(await view.locator('#context-tokens').textContent(),'20K / 100K tok');
   assert.equal(await view.locator('#strip-context').textContent(),'20%');
   assert.deepEqual(await view.locator('.metric-label span').allTextContents(),['速度','缓存','上下文']);
   assert.deepEqual(await frame(),initialFrame,'Language switches must not resize the frame');

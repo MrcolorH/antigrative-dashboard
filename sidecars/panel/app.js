@@ -113,18 +113,6 @@ function render() {
   $('context-summary').textContent=hasCapacity?t('contextUsed',{used:Math.round(context.usedFraction*100),remaining:Math.round(context.remainingFraction*100)}):t('contextUnknown');
   $('context-tokens').textContent=context?t('contextTokens',{used:compact(context.usedTokens),max:context.maxTokens===null?'—':compact(context.maxTokens)}):'—';
   $('context-model').textContent=context?.model||'—';
-  $('context-host-limit').textContent=context?.maxTokens?`${count(context.maxTokens)} tok`:t('contextLimitUnknown');
-  $('context-provider-row').hidden=!context?.providerCapacityLabel;
-  $('context-provider-limit').textContent=context?.providerCapacityLabel?`${context.providerCapacityLabel} tok`:'—';
-  $('context-provider-limit').title=t('contextReferenceBasis');
-  $('context-compaction-limit').textContent=context?.compressionLimit?`${count(context.compressionLimit)} tok`:t('contextLimitUnknown');
-  const transcript=speed?.transcriptStats,transcriptAvailable=transcript&&['ready','partial'].includes(transcript.status);
-  $('transcript-details').hidden=!transcript;
-  $('transcript-details').title=t('transcriptBasis');
-  $('transcript-total').textContent=transcriptAvailable?`${compact(transcript.totalTokens)} tok${transcript.complete?'':' · '+t('transcriptPartial')}${speed.transcriptRestoredFromHistory?' · '+t('transcriptSaved'):''}`:t(transcript?.status==='loading'?'transcriptLoading':'transcriptUnavailable');
-  for(const [id,key] of [['user','userTokens'],['assistant','assistantTokens'],['tool','toolTokens'],['system','systemTokens'],['markers','compactionMarkers'],['images','imageSteps']])$('transcript-'+id).textContent=transcriptAvailable?count(transcript[key]):'—';
-  const restored=context&&(speed.contextRestored===true||speed.restoredFromHistory&&speed.contextRestored!==false);
-  $('context-note').textContent=(context?t('contextBasis'):t('contextUnavailable'))+(restored?' '+t('contextSaved',{time:speed.savedAt?language.resetDate(speed.savedAt):'—'}):'')+(hasCapacity&&context.usedFraction>1?' '+t('contextExceeded'):'');
   $('context-fill').style.width=hasCapacity?`${Math.min(1,context.usedFraction)*100}%`:'0%';
   $('context-fill').style.background=hasCapacity&&context.usedFraction>=.9?'var(--pulse-danger)':'';
   if(hasCapacity){$('context-track').setAttribute('aria-valuenow',String(Math.min(100,context.usedFraction*100)));$('context-track').setAttribute('aria-valuemin','0');$('context-track').setAttribute('aria-valuemax','100');}else $('context-track').removeAttribute('aria-valuenow');

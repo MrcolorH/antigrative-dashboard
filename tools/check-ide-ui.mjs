@@ -40,9 +40,7 @@ try{
  // Keep a constrained, scrolled card open across multiple real polling ticks.
  // Identical preferences must not replace its labels or oscillate maxHeight.
  await page.locator('[data-card=context]').click();
- assert.equal(await page.locator('#transcript-total').textContent(),'360 tok · partial');
- await page.locator('#transcript-details summary').click();assert.equal(await page.locator('#transcript-user').textContent(),'100');assert.equal(await page.locator('#transcript-markers').textContent(),'1');
- await page.locator('#transcript-details summary').click();
+ assert.equal(await page.locator('#transcript-details,#context-host-limit,#context-provider-limit,#context-compaction-limit,#context-note').count(),0);
  const stable=await page.evaluate(async()=>{
    const root=document.getElementById('ag-pulse-status-bar').shadowRoot,card=root.getElementById('context-card');
    card.scrollTop=80;const scroll=card.scrollTop,rect=card.getBoundingClientRect().toJSON(),requests=metricsRequests.length;
@@ -66,7 +64,7 @@ try{
  await page.evaluate(()=>{testQuality=null;});
  await page.waitForFunction(()=>document.getElementById('ag-pulse-status-bar').shadowRoot.getElementById('tps').textContent==='200.0');
  await page.keyboard.press('Escape');
- await page.locator('[data-card=context]').click();await page.locator('#card-language-zh').click();await page.waitForTimeout(150);assert.equal((await state()).lang,'zh-CN');assert.equal(await page.locator('#transcript-total').textContent(),'360 tok · 不完整');await page.keyboard.press('Escape');
+ await page.locator('[data-card=context]').click();await page.locator('#card-language-zh').click();await page.waitForTimeout(150);assert.equal((await state()).lang,'zh-CN');assert.equal(await page.locator('#transcript-details').count(),0);await page.keyboard.press('Escape');
  await page.evaluate(quality=>{testQuality=quality;},quality);
  await page.waitForFunction(()=>document.getElementById('ag-pulse-status-bar').shadowRoot.getElementById('latest-rate').textContent==='计时异常');
  await page.locator('[data-card=speed]').click();assert.equal(await page.locator('#rate-note').textContent(),'统计方式：正文 Token ÷ 流式时长；会话 TPS 按总时长加权。');
@@ -75,10 +73,10 @@ try{
  await page.evaluate(other=>{const decoy={props:{cascadeId:other},__k:[]};testOwner.__k.unshift(decoy);},other);
  assert.equal((await state()).id,id);
  await page.evaluate(()=>{testOwner.props.cascadeId=null;});await page.waitForTimeout(1400);assert.equal((await state()).id,null);assert.equal((await state()).tps,'—');assert.equal((await state()).icons.filter(e=>!e.hidden).length,3);
- assert.match(await page.locator('#context-note').textContent(),/当前为新对话/);assert.equal(await page.locator('#five-balance').textContent(),'80.0%');
+ assert.equal(await page.locator('#context-summary').textContent(),'尚无请求');assert.equal(await page.locator('#five-balance').textContent(),'80.0%');
  await page.evaluate(other=>{testOwner.props.cascadeId=other;},other);await page.waitForTimeout(1400);assert.equal((await state()).id,other);
  await page.evaluate(()=>{delete document.querySelector('.panel').__k;});await page.waitForTimeout(1400);assert.equal((await state()).id,null);assert.equal((await state()).tps,'—');
- assert.equal(await page.evaluate(()=>window.__agPulseSurface.conversationState(window.__agPulseSurface.findComposer()).status),'unavailable');assert.match(await page.locator('#context-note').textContent(),/此请求暂无/);
+ assert.equal(await page.evaluate(()=>window.__agPulseSurface.conversationState(window.__agPulseSurface.findComposer()).status),'unavailable');assert.equal(await page.locator('#context-summary').textContent(),'上下文容量不可用');
  assert.deepEqual(errors,[]);results.push({trustedTypesEnforced:true,narrow,wide,cardsInteractive:true,nativeModelPreserved:true,stablePolling:stable,emptyAndSwitchedConversationsIsolated:true,missingPrivateAPIUnavailable:true});
  await mkdir(join(repo,'.data/ide'),{recursive:true});await writeFile(join(repo,'.data/ide/ui-report.json'),JSON.stringify({results,pageErrors:errors},null,2));console.log(JSON.stringify({results,pageErrors:errors},null,2));
 }finally{await browser.close();await new Promise(r=>server.close(r));}
