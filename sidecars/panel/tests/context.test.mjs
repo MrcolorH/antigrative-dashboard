@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { mkdtemp, readFile, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { contextMetrics } from '../context.mjs';
+import { contextMetrics, safeContext, formatModelName, modelContextReference, modelContextCapacity, modelCompressionLimit } from '../context.mjs';
 import { trajectoryMetrics } from '../metrics.mjs';
 import { SessionHistory, safeMetrics } from '../history.mjs';
 import { MetricsStore } from '../store.mjs';
@@ -58,4 +58,77 @@ test('live lower context updates even when cumulative TPS history is protected',
   await store.session(id,true);n=1;used=20;
   const current=await store.session(id,true);
   assert.equal(current.requests,3);assert.equal(current.context.usedFraction,.2);assert.equal(current.contextRestored,false);
+});
+
+test('provider references never override a valid host capacity or infer compaction', () => {
+  assert.equal(modelContextCapacity('gemini-3.8-flash-n'), 1048576);
+  assert.equal(modelContextCapacity('Gemini 3.8 Flash (High)'), 1048576);
+  assert.equal(modelContextReference('Claude Sonnet 5.5 (Thinking)').label, '1M');
+  assert.equal(modelContextReference('Claude Sonnet 4.6 (Thinking)').label, '1M');
+  assert.equal(modelContextCapacity('Claude Sonnet 5.5 (Thinking)'), null,'Do not invent an exact number from the inspected 1M label');
+  assert.equal(modelContextCapacity('GPT-OSS 120B (Medium)'), 131072);
+  assert.equal(modelContextCapacity('unknown-model'), null);
+
+  for(const model of ['gemini-3.8-flash-n','MODEL_PLACEHOLDER_M318','claude-sonnet-5.5','claude-sonnet-4-6','gpt-oss-120b'])assert.equal(modelCompressionLimit(model),null);
+
+  assert.equal(formatModelName('gemini-3.8-flash-n'), 'Gemini 3.8 Flash');
+  assert.equal(formatModelName('MODEL_PLACEHOLDER_M318'), 'Gemini 3.8 Flash (High)');
+  assert.equal(formatModelName('MODEL_PLACEHOLDER_M319'), 'Gemini 3.8 Flash (Medium)');
+  assert.equal(formatModelName('MODEL_PLACEHOLDER_M320'), 'Gemini 3.8 Flash (Low)');
+  assert.equal(formatModelName('MODEL_PLACEHOLDER_M317'), 'MODEL_PLACEHOLDER_M317');
+
+  const result = contextMetrics(
+    { estimatedTokensUsed: 128000, maxContextTokens: 256000 },
+    { model: 'gemini-3.8-flash-n' }
+  );
+  assert.equal(result.usedTokens, 128000);
+  assert.equal(result.maxTokens, 256000);
+  assert.equal(result.providerMaxTokens,1048576);
+  assert.equal(result.capacitySource,'host-reported');
+  assert.equal(result.compressionLimit,null);
+  assert.equal(result.usedFraction,.5);
+  assert.equal(result.compressionFraction,null);
+  assert.equal(result.model, 'Gemini 3.8 Flash');
+});
+test('80% host occupancy stays 80% while the larger provider input reference is displayed separately',()=>{
+ const result=contextMetrics({estimatedTokensUsed:80000,maxContextTokens:100000},{model:'Gemini 3.8 Flash (High)'});
+ assert.equal(result.usedFraction,.8);assert.equal(result.remainingTokens,20000);assert.equal(result.providerMaxTokens,1048576);
+});
+test('equivalent model IDs normalize identically without changing versions or inventing effort',()=>{
+ for(const family of ['sonnet','opus'])for(const version of ['4.6','5.5']){
+  const dot=`claude-${family}-${version}`,dash=dot.replace('.', '-');
+  assert.equal(formatModelName(dot),formatModelName(dash));assert.deepEqual(modelContextReference(dot),modelContextReference(dash));
+  assert.equal(modelContextReference(dot).label,'1M');assert.ok(!formatModelName(dot).includes('Thinking'));
+  assert.match(formatModelName(`Claude ${family} ${version} (Thinking)`),/\(Thinking\)$/);
+ }
+ assert.equal(formatModelName('MODEL_PLACEHOLDER_M35'),'Claude Sonnet 4.6 (Thinking)');
+ assert.equal(formatModelName('MODEL_PLACEHOLDER_M26'),'Claude Opus 4.6 (Thinking)');
+ assert.equal(formatModelName('MODEL_OPENAI_GPT_OSS_120B_MEDIUM'),'GPT-OSS 120B (Medium)');
+});
+test('unknown/family/specialized model names never inherit another model reference',()=>{
+ for(const model of ['Gemini','gemini-3.8-flash-tts','gemini-3.8-flash-lite','Claude','claude-sonnet-4-5','claude-sonnet-4','claude-sonnet-5-5-custom','gpt-oss','gpt-oss-20b','MODEL_PLACEHOLDER_M317','MODEL_PLACEHOLDER_M421','user-gemini-3.8-flash-custom']){
+  assert.equal(modelContextReference(model),null,model);assert.equal(formatModelName(model),model);
+ }
+ for(const model of [undefined,null,123,'',' \n\t'])assert.equal(modelContextReference(model),null);
+});
+test('known provider capacity cannot fabricate a missing, zero or invalid host denominator',()=>{
+ for(const maxContextTokens of [undefined,0,-1,Infinity,'',true,{},Number.MAX_SAFE_INTEGER+1]){
+  const value=contextMetrics({estimatedTokensUsed:20,maxContextTokens},{model:'Gemini 3.8 Flash (High)'});
+  assert.equal(value.maxTokens,null);assert.equal(value.usedFraction,null);assert.equal(value.providerMaxTokens,1048576);
+ }
+});
+test('saved derived fields and arbitrary reference/threshold data are never trusted',()=>{
+ const value=safeContext({usedTokens:80000,maxTokens:100000,model:'Gemini 3.8 Flash (High)',usedFraction:.01,remainingTokens:999999,
+  providerMaxTokens:999999999,providerCapacityLabel:'PRIVATE',providerCapacitySource:'https://example.com/private',compressionLimit:200000,compressionFraction:4,credential:'secret',breakdown:{private:'PRIVATE'}});
+ assert.equal(value.usedFraction,.8);assert.equal(value.remainingTokens,20000);assert.equal(value.providerMaxTokens,1048576);
+ assert.equal(value.compressionLimit,null);assert.equal(value.compressionFraction,null);assert.ok(!JSON.stringify(value).includes('PRIVATE'));assert.ok(!JSON.stringify(value).includes('secret'));
+ assert.equal(safeContext({usedTokens:Infinity,maxTokens:100}),null);
+});
+test('provider reference and unknown threshold survive numeric history round trips',async t=>{
+ const directory=await mkdtemp(join(tmpdir(),'ag-context-reference-'));t.after(()=>rm(directory,{recursive:true,force:true}));
+ const history=new SessionHistory(directory),response=raw(128000,256000);
+ response.trajectory.generatorMetadata[0].chatModel.modelDisplayName='Gemini 3.8 Flash (High)';
+ await history.save(scope,id,trajectoryMetrics(response));const restored=(await history.load(scope,id)).metrics.context;
+ assert.equal(restored.usedFraction,.5);assert.equal(restored.maxTokens,256000);assert.equal(restored.providerMaxTokens,1048576);assert.equal(restored.compressionLimit,null);
+ const saved=JSON.parse(await readFile(history.file(scope,id),'utf8'));assert.equal(saved.metrics.context.providerCapacitySource,'https://ai.google.dev/gemini-api/docs/models/gemini-3.8-flash');
 });

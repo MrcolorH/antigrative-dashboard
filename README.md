@@ -209,6 +209,8 @@ These are conservative checks on host timing summaries, not proof of buffering. 
 
 ## Saved conversation statistics
 
+Context occupancy uses the current request's host-reported window. The details show provider capacity references separately; an unverified compaction threshold remains **Unknown**. Provider specifications never replace a valid host denominator. See [context limits and sources](docs/CONTEXT_LIMITS.md).
+
 Completed-request TPS, cache counts and whitelisted context estimates are saved automatically in `~/.gemini/antigravity/sidecar_data/antigravity-pulse/panel/data/history-v1/<account-hash>/<conversation-id>.json`. Reloading, restarting, updating or reinstalling the plugin preserves them. Empty or regressing backend data cannot erase a useful saved sample. Saved fallbacks show their saved time in the details. A real 0% cache hit remains 0%.
 
 Records contain whitelisted statistics and model/status only; no prompts, titles, emails or credentials. The current account must be authenticated before its saved files are loaded. Already missing timing cannot be reconstructed. To backfill all conversations still available from the local API and check restart restoration, run `node tools/check-live-history.mjs` with Antigravity open.
