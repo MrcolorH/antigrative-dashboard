@@ -47,7 +47,7 @@ async function loadBundledSdk() {
     }
     const sdk = binary.subarray(start,tailIndex + Buffer.byteLength(tail)).toString('utf8');
     const preload = binary.subarray(preloadStart,preloadEnd + Buffer.byteLength(preloadTail)).toString('utf8');
-    if (!sdk.includes("const BIND_HOST = '127.0.0.1'") || !preload.includes('window.sidecar =')) throw new Error('SDK 资源校验失败');
+    if ((!sdk.includes("const BIND_HOST = '127.0.0.1'") && !sdk.includes('export class SidecarApp')) || !preload.includes('window.sidecar =')) throw new Error('SDK 资源校验失败');
     await mkdir(root,{recursive:true});
     await writeFile(join(root,'index.mjs'),sdk);
     await writeFile(join(root,'preload.js'),preload);

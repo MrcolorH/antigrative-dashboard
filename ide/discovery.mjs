@@ -41,7 +41,9 @@ export async function discoverIdeProcesses(debugPort,{platform=process.platform,
     }else if(platform==='linux')ports=new Map(await Promise.all(rows.map(async r=>[r.ProcessId,await linuxPort(r.ProcessId).catch(()=>[])])));
     else throw Error('Unsupported IDE platform');
   }
-  const owners=new Map();for(const [pid,values] of ports)for(const port of values)owners.set(port,pid);
+  const isIde = pid => rows.some(r => r.ProcessId === pid && /^(?:Antigravity IDE(?:\.exe)?|antigravity-ide)$/i.test(r.Name || ''));
+  const owners=new Map();
+  for(const [pid,values] of ports) for(const port of values) if(!owners.has(port) || isIde(pid)) owners.set(port,pid);
   const selected=selectIdeServer(rows,owners,debugPort);
   return {...selected,Ports:ports.get(selected.ProcessId)||[]};
 }
