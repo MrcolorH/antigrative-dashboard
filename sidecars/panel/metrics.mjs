@@ -1,5 +1,5 @@
 // Pure transforms. No credentials, prompts, or message text enter the public result.
-import { contextMetrics, readTranscriptStats } from './context.mjs';
+import { contextMetrics } from './context.mjs';
 import { classifyRates, RATE_VERSION, RATE_REASONS } from './rate-quality.mjs';
 export function seconds(value) {
   if (typeof value === 'number') return Number.isFinite(value) && value >= 0 ? value : null;
@@ -177,7 +177,6 @@ export function trajectoryMetrics(response) {
     context: contextMetrics(lastChat?.chatStartMetadata?.contextWindowMetadata, {
       model:lastChat?.modelDisplayName || lastChat?.responseModel || String(lastChat?.model || ''),
       sampledAt:lastChat?.chatStartMetadata?.createdAt,
-      transcriptStats: trajectory.cascadeId ? readTranscriptStats(trajectory.cascadeId, steps.length) : null,
     }),
     complete: Number(response.numTotalGeneratorMetadata ?? generators.length) === generators.length,
   };

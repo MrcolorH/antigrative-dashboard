@@ -54,7 +54,7 @@ test('simultaneous claims in separate live processes retain the newest owner',as
   t.after(()=>{for(const child of children)child.kill();});
   const wait=(child,type)=>new Promise((resolve,reject)=>{
     const timer=setTimeout(()=>{cleanup();reject(new Error('Child ownership test timed out: '+type));},5000);
-    const message=value=>{if(value.type===type){cleanup();resolve(value);}};
+    const message=value=>{if(value.type==='failed'){cleanup();reject(new Error('Child ownership claim failed: '+value.code+' '+value.message));}else if(value.type===type){cleanup();resolve(value);}};
     const exit=()=>{cleanup();reject(new Error('Child exited before '+type));};
     function cleanup(){clearTimeout(timer);child.off('message',message);child.off('exit',exit);}
     child.on('message',message);child.once('exit',exit);
@@ -62,7 +62,7 @@ test('simultaneous claims in separate live processes retain the newest owner',as
   for(const generation of [3,1,2]){
     const code=`import {SidecarOwner} from ${JSON.stringify(moduleUrl)};
       const owner=new SidecarOwner(${JSON.stringify(data)},{startedAt:${generation}});
-      process.on('message',async command=>{try{if(command==='go'){await owner.claim();process.send({type:'claimed'});}else if(command==='finish'){owner.stop();process.exit(0);}}catch{process.exit(1);}});
+      process.on('message',async command=>{try{if(command==='go'){await owner.claim();process.send({type:'claimed'});}else if(command==='finish'){owner.stop();process.exit(0);}}catch(error){process.send({type:'failed',code:error.code||'',message:error.message});}});
       process.send({type:'ready'});`;
     const child=spawn(process.execPath,['--input-type=module','-e',code],{stdio:['ignore','ignore','ignore','ipc'],windowsHide:true});
     children.push(child);await wait(child,'ready');

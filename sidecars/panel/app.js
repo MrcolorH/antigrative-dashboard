@@ -107,48 +107,22 @@ function render() {
   $('speed-basis').textContent = language.rateNote(speed)+savedNote+saveWarning;
   const cache=speed?.cache;
   const context=speed?.context,hasCapacity=typeof context?.usedFraction==='number';
-  const isComp=context?.compressionDetected||(context?.compactionCount>0);
   $('strip-context').textContent=hasCapacity?`${Math.round(context.usedFraction*100)}%`:'—';
   $('strip-context-size').textContent=context?`${compact(context.usedTokens)} / ${context.maxTokens===null?'—':compact(context.maxTokens)}`:'—';
-  $('context-tab').title=context?t('contextTokens',{used:count(context.usedTokens),max:context.maxTokens===null?'—':count(context.maxTokens)})+(isComp?` (${t('contextStatus')}: ${t('contextCompressed',{count:context.compactionCount||1})})`:''):t('contextUnknown');
+  $('context-tab').title=context?t('contextTokens',{used:count(context.usedTokens),max:context.maxTokens===null?'—':count(context.maxTokens)}):t('contextUnknown');
   $('context-summary').textContent=hasCapacity?t('contextUsed',{used:Math.round(context.usedFraction*100),remaining:Math.round(context.remainingFraction*100)}):t('contextUnknown');
   $('context-tokens').textContent=context?t('contextTokens',{used:compact(context.usedTokens),max:context.maxTokens===null?'—':compact(context.maxTokens)}):'—';
   $('context-model').textContent=context?.model||'—';
-  if($('context-native-limit'))$('context-native-limit').textContent=context?.maxTokens?`${compact(context.maxTokens)} tok (${count(context.maxTokens)})`:'—';
-  if($('context-comp-limit')){
-    const compLimit=context?.compressionLimit;
-    const compPct=compLimit&&context.usedTokens?` (${Math.round((context.usedTokens/compLimit)*100)}%)`:'';
-    $('context-comp-limit').textContent=compLimit?`${compact(compLimit)} tok${compPct}`:'—';
-  }
-  if($('context-status')){
-    const isComp=context?.compressionDetected||(context?.compactionCount>0);
-    $('context-status').textContent=isComp?t('contextCompressed',{count:context.compactionCount||1}):t('contextNormal');
-  }
-  if($('context-images-row')){
-    const imgCount=context?.imageGenStepCount||0;
-    $('context-images-row').hidden=imgCount<=0;
-    if($('context-images'))$('context-images').textContent=`📷 ${imgCount}`;
-  }
+  $('context-host-limit').textContent=context?.maxTokens?`${count(context.maxTokens)} tok`:t('contextLimitUnknown');
+  $('context-provider-row').hidden=!context?.providerCapacityLabel;
+  $('context-provider-limit').textContent=context?.providerCapacityLabel?`${context.providerCapacityLabel} tok`:'—';
+  $('context-provider-limit').title=t('contextReferenceBasis');
+  $('context-compaction-limit').textContent=context?.compressionLimit?`${count(context.compressionLimit)} tok`:t('contextLimitUnknown');
   const restored=context&&(speed.contextRestored===true||speed.restoredFromHistory&&speed.contextRestored!==false);
-  const basisText=context?.source==='Antigravity session transcript'?t('contextTranscriptBasis'):t('contextBasis');
-  const dualNote=context?.maxTokens&&context?.compressionLimit?' '+t('contextDualBasis',{max:compact(context.maxTokens),compLimit:compact(context.compressionLimit)}):'';
-  $('context-note').textContent=(context?basisText+dualNote:t('contextUnavailable'))+(restored?' '+t('contextSaved',{time:speed.savedAt?language.resetDate(speed.savedAt):'—'}):'')+(hasCapacity&&context.usedFraction>1?' '+t('contextExceeded'):'');
+  $('context-note').textContent=(context?t('contextBasis'):t('contextUnavailable'))+(restored?' '+t('contextSaved',{time:speed.savedAt?language.resetDate(speed.savedAt):'—'}):'')+(hasCapacity&&context.usedFraction>1?' '+t('contextExceeded'):'');
   $('context-fill').style.width=hasCapacity?`${Math.min(1,context.usedFraction)*100}%`:'0%';
   $('context-fill').style.background=hasCapacity&&context.usedFraction>=.9?'var(--pulse-danger)':'';
   if(hasCapacity){$('context-track').setAttribute('aria-valuenow',String(Math.min(100,context.usedFraction*100)));$('context-track').setAttribute('aria-valuemin','0');$('context-track').setAttribute('aria-valuemax','100');}else $('context-track').removeAttribute('aria-valuenow');
-  if($('context-tools')){
-    const bd=context?.breakdown;
-    $('context-tools-row').hidden=!bd;
-    $('context-agent-row').hidden=!bd;
-    $('context-user-row').hidden=!bd;
-    if($('context-system-row'))$('context-system-row').hidden=!bd||!bd.systemTokens;
-    if(bd&&context.usedTokens>0){
-      $('context-tools').textContent=`${compact(bd.toolTokens)} tok (${Math.round((bd.toolTokens/context.usedTokens)*100)}%)`;
-      $('context-agent').textContent=`${compact(bd.agentTokens)} tok (${Math.round((bd.agentTokens/context.usedTokens)*100)}%)`;
-      $('context-user').textContent=`${compact(bd.userTokens)} tok (${Math.round((bd.userTokens/context.usedTokens)*100)}%)`;
-      if($('context-system'))$('context-system').textContent=`${compact(bd.systemTokens)} tok (${Math.round((bd.systemTokens/context.usedTokens)*100)}%)`;
-    }
-  }
   $('strip-cache').textContent=percent(cache?.hitRate);$('cache-rate').textContent=percent(cache?.hitRate);
   const tokens=speed?.tokens || cache;
   const partial=tokens?.measuredRequests&&tokens.complete===false;

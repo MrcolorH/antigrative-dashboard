@@ -529,7 +529,7 @@ module.exports = function installAgPulseInlineWidget() {
       <div class="heading"><span>${svg('context')}<span data-i18n="context">Context window</span></span></div>
       <strong id="context-summary">—</strong><p id="context-tokens">—</p>
       <div class="track" role="progressbar" data-i18n-aria="context" id="context-track"><i id="context-fill"></i></div>
-      <dl><div><dt data-i18n="contextModel">Sampled model</dt><dd id="context-model">—</dd></div></dl><p class="footnote" id="context-note">—</p>
+      <dl><div><dt data-i18n="contextModel">Sampled model</dt><dd id="context-model">—</dd></div><div><dt data-i18n="contextHostLimit">Active window (host)</dt><dd id="context-host-limit">—</dd></div><div id="context-provider-row" hidden><dt data-i18n="contextProviderCapacity">Provider capacity reference</dt><dd id="context-provider-limit">—</dd></div><div><dt data-i18n="contextCompressionLimit">Compaction threshold</dt><dd id="context-compaction-limit">—</dd></div></dl><p class="footnote" id="context-note">—</p>
       <div class="heading quota-heading"><span data-i18n="group">Quota group</span><div class="toolbar"><button class="group-trigger" data-i18n-aria="group" aria-haspopup="listbox" aria-expanded="false">Quota ▾</button><div class="group-menu" role="listbox" data-i18n-aria="selectGroup" hidden></div><button class="refresh" data-i18n-aria="refresh" aria-label="Refresh quota" title="Refresh quota"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M12.8 6a5.1 5.1 0 1 0 .1 4M12.8 2.5V6H9.2"/></svg></button></div></div>
       <div class="quota-details">${['five','week'].map(name=>`<section class="quota-section" data-i18n-aria="${name}" aria-label="${t(name)}"><div class="quota-title"><span>${svg(name)}<span data-i18n="${name}">${t(name)}</span></span><strong id="${name}-balance">—</strong><span class="dim" data-i18n="remaining">remaining</span></div><div class="track" role="progressbar" data-i18n-aria="${name}" id="${name}-track"><i id="${name}-fill"></i></div><dl><div><dt data-i18n="resetIn">Resets in</dt><dd class="reset" id="${name}-countdown">—</dd></div><div><dt data-i18n="resetTime">Reset time (UTC+8)</dt><dd id="${name}-reset">—</dd></div></dl><p class="footnote" id="${name}-note">${t('loadingQuota')}</p></section>`).join('')}</div>
     </section>`);
@@ -630,39 +630,16 @@ module.exports = function installAgPulseInlineWidget() {
     text('context-summary',hasCapacity?t('contextUsed',{used:Math.round(context.usedFraction*100),remaining:Math.round(context.remainingFraction*100)}):t(empty?'waitingRequest':'contextUnknown'));
     text('context-tokens',context?t('contextTokens',{used:compact(context.usedTokens),max:context.maxTokens===null?'—':compact(context.maxTokens)}):'—');
     text('context-model',context?.model||'—');
-    if($('context-native-limit'))text('context-native-limit',context?.maxTokens?`${compact(context.maxTokens)} tok (${count(context.maxTokens)})`:'—');
-    if($('context-comp-limit')){
-      const compLimit=context?.compressionLimit;
-      const compPct=compLimit&&context.usedTokens?` (${Math.round((context.usedTokens/compLimit)*100)}%)`:'';
-      text('context-comp-limit',compLimit?`${compact(compLimit)} tok${compPct}`:'—');
-    }
-    if($('context-status')){
-      const isComp=context?.compressionDetected||(context?.compactionCount>0);
-      text('context-status',isComp?t('contextCompressed',{count:context.compactionCount||1}):t('contextNormal'));
-    }
-    if($('context-images-row')){
-      const imgCount=context?.imageGenStepCount||0;
-      hidden($('context-images-row'),imgCount<=0);
-      if($('context-images'))text('context-images',`📷 ${imgCount}`);
-    }
+    text('context-host-limit',context?.maxTokens?`${count(context.maxTokens)} tok`:t('contextLimitUnknown'));
+    hidden($('context-provider-row'),!context?.providerCapacityLabel);
+    text('context-provider-limit',context?.providerCapacityLabel?`${context.providerCapacityLabel} tok`:'—');
+    attribute($('context-provider-limit'),'title',t('contextReferenceBasis'));
+    text('context-compaction-limit',context?.compressionLimit?`${count(context.compressionLimit)} tok`:t('contextLimitUnknown'));
     const restored=context&&(speed.contextRestored===true||speed.restoredFromHistory&&speed.contextRestored!==false);
-    const basisText=context?.source==='Antigravity session transcript'?t('contextTranscriptBasis'):t('contextBasis');
-    const dualNote=context?.maxTokens&&context?.compressionLimit?' '+t('contextDualBasis',{max:compact(context.maxTokens),compLimit:compact(context.compressionLimit)}):'';
-    text('context-note',(context?basisText+dualNote:t(empty?'newConversationStats':'contextUnavailable'))+(restored?' '+t('contextSaved',{time:speed.savedAt?language.resetDate(speed.savedAt):'—'}):'')+(hasCapacity&&context.usedFraction>1?' '+t('contextExceeded'):''));
+    text('context-note',(context?t('contextBasis'):t(empty?'newConversationStats':'contextUnavailable'))+(restored?' '+t('contextSaved',{time:speed.savedAt?language.resetDate(speed.savedAt):'—'}):'')+(hasCapacity&&context.usedFraction>1?' '+t('contextExceeded'):''));
     style($('context-fill'),'width',hasCapacity?`${Math.min(1,context.usedFraction)*100}%`:'0%');
     style($('context-fill'),'background',hasCapacity&&context.usedFraction>=.9?'var(--pulse-danger)':'');
     attribute($('context-track'),'aria-valuenow',hasCapacity?Math.min(100,context.usedFraction*100):null);attribute($('context-track'),'aria-valuemin','0');attribute($('context-track'),'aria-valuemax','100');
-    const bd=context?.breakdown;
-    hidden($('context-tools-row'),!bd);
-    hidden($('context-agent-row'),!bd);
-    hidden($('context-user-row'),!bd);
-    if($('context-system-row'))hidden($('context-system-row'),!bd||!bd.systemTokens);
-    if(bd&&context.usedTokens>0){
-      text('context-tools',`${compact(bd.toolTokens)} tok (${Math.round((bd.toolTokens/context.usedTokens)*100)}%)`);
-      text('context-agent',`${compact(bd.agentTokens)} tok (${Math.round((bd.agentTokens/context.usedTokens)*100)}%)`);
-      text('context-user',`${compact(bd.userTokens)} tok (${Math.round((bd.userTokens/context.usedTokens)*100)}%)`);
-      if($('context-system'))text('context-system',`${compact(bd.systemTokens)} tok (${Math.round((bd.systemTokens/context.usedTokens)*100)}%)`);
-    }
     text('tps',rate(speed?.tps));text('rounds',speed?t('rounds',{rounds:speed.rounds,steps:speed.steps}):'');
     text('samples',speed?t('sample',{rounds:speed.rounds,steps:speed.steps,requests:speed.measuredRequests}):t('waitingRequest'));text('model-time',seconds(speed?.modelSeconds));text('tool-time',seconds(speed?.toolSeconds));text('ttft',seconds(speed?.ttftSeconds));text('session-rate',`${rate(speed?.tps)} tok/s`);text('latest-rate',`${rate(speed?.latestTps)} tok/s`);text('tokens',speed?`${count(speed.counts.responseOutput)} / ${count(speed.counts.thinkingOutput)} tok`:'—');
     if(speed?.latestRateStatus==='unreliable')text('latest-rate',t('timingUnreliable'));
