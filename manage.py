@@ -129,6 +129,12 @@ def install(panel_only=False, legacy_loader=False):
         settings['profile'] = str(_paths['profile'])
     atomic_json(SETTINGS, settings)
     set_enabled(True)
+    backfill_tool = SOURCE / 'tools' / 'backfill-usage.mjs'
+    if backfill_tool.exists():
+        try:
+            subprocess.run(['node', str(backfill_tool)], timeout=20)
+        except Exception:
+            pass
     print('Installed:', PLUGIN)
     print('Fully quit and reopen Antigravity to start the plugin runtime. App updates no longer overwrite the inline adapter.')
 

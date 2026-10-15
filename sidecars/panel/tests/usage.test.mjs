@@ -60,3 +60,13 @@ test('IDE usage keeps a separate ledger and source across collector restarts',as
  assert.equal((await desktop.summary(account)).totalTokens,0);
  const restarted=new DesktopUsage(store,new UsageLedger(ide.directory,{source:'ide-local'}));await restarted.sync();assert.equal((await restarted.snapshot()).totalTokens,1100);assert.equal((await restarted.snapshot()).requests,1);
 });
+test('initial one-time backfill discovers disk conversations and manual refresh re-checks them',async t=>{
+ const ledger=await fixture(t);
+ const store={identity:account,epoch:1,listConversations:async()=>[],
+  client:{call:async(name,args)=>name.includes('GeneratorMetadata')?{generatorMetadata:raw({usage:{responseId:args?.cascadeId}}).trajectory.generatorMetadata}:{steps:raw().trajectory.steps}}};
+ const localIds=['33333333-3333-3333-3333-333333333333','44444444-4444-4444-4444-444444444444'];
+ const tracker=new DesktopUsage(store,ledger,{getLocalIds:()=>localIds});
+ await tracker.sync();assert.equal((await tracker.snapshot()).totalTokens,2200);
+ await tracker.sync(false);assert.equal((await tracker.snapshot()).totalTokens,2200);
+ await tracker.sync(true);assert.equal((await tracker.snapshot()).totalTokens,2200);
+});

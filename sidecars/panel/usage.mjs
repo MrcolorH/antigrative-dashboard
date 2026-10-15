@@ -1,5 +1,7 @@
 // Local usage ledger. Never stores prompts, credentials or raw request IDs.
 import {readFile,writeFile,mkdir,rename,readdir,unlink} from 'node:fs/promises';
+import {existsSync,statSync,readdirSync} from 'node:fs';
+import {homedir} from 'node:os';
 import {join} from 'node:path';
 import {createHash,randomUUID} from 'node:crypto';
 import {tokenCount,requestCacheMetrics} from './metrics.mjs';
@@ -10,6 +12,24 @@ const keys=['uncached','cacheRead','cacheWrite','output'];
 const cleanModel=value=>String(value||'Unknown').replace(/[\x00-\x1f\x7f]/g,'').slice(0,120);
 const stamp=value=>typeof value==='string'&&/^20\d\d-\d\d-\d\dT/.test(value)&&Number.isFinite(Date.parse(value))?Date.parse(value):null;
 const sum=r=>keys.reduce((n,k)=>n+(r[k]??0),0);
+export function localConversationIds(home=homedir()){
+  const ids=new Set();
+  const roots=[
+    join(home,'.gemini','antigravity','conversations'),
+    join(home,'.gemini','antigravity','brain'),
+    join(home,'.gemini','antigravity-ide','conversations'),
+    join(home,'.gemini','antigravity-ide','brain'),
+  ];
+  for(const root of roots){
+    try{
+      for(const f of readdirSync(root)){
+        const id=f.replace(/\.db$/,'');
+        if(GUID.test(id))ids.add(id.toLowerCase());
+      }
+    }catch{}
+  }
+  return [...ids];
+}
 export function dateKey(time,zone='Asia/Shanghai'){
   const parts=new Intl.DateTimeFormat('en-CA',{timeZone:zone,year:'numeric',month:'2-digit',day:'2-digit'}).formatToParts(time);
   const get=key=>parts.find(p=>p.type===key).value;return `${get('year')}-${get('month')}-${get('day')}`;
@@ -93,17 +113,58 @@ export class UsageLedger{
 export function weekStart(date){const d=new Date(date+'T00:00:00Z');d.setUTCDate(d.getUTCDate()-((d.getUTCDay()+6)%7));return d.toISOString().slice(0,10);}
 
 export class DesktopUsage{
-  constructor(store,ledger=new UsageLedger()){this.store=store;this.ledger=ledger;this.fingerprints=new Map();}
-  syncing=false;lastSync=0;status='waiting';missingConversations=0;scope=null;
+  constructor(store,ledger=new UsageLedger(),{getLocalIds=null}={}){
+    this.store=store;this.ledger=ledger;
+    const isLive=getLocalIds!==null||ledger.directory.includes('.gemini');
+    this.getLocalIds=getLocalIds||(isLive?localConversationIds:()=>[]);
+    this.fingerprints=new Map();
+  }
+  syncing=false;lastSync=0;status='waiting';missingConversations=0;scope=null;initialSynced=false;
   async ingest(scope,id,raw){await this.ledger.ingest(scope,id,raw);}
-  sync(){
+  async fetchRaw(id){
+    if(typeof this.store.client?.call==='function'){
+      try{
+        const [g,s]=await Promise.all([
+          this.store.client.call('GetCascadeTrajectoryGeneratorMetadata',{cascadeId:id,generatorMetadataOffset:0,includeMessages:false}),
+          this.store.client.call('GetCascadeTrajectorySteps',{cascadeId:id,stepOffset:0,trajectoryVerbosity:3})
+        ]);
+        return {trajectory:{cascadeId:id,steps:s.steps||[],generatorMetadata:g.generatorMetadata||g.generatorMetadatas||[]}};
+      }catch{}
+    }
+    if(typeof this.store.client?.trajectory==='function'){
+      try{return await this.store.client.trajectory(id);}catch{}
+    }
+    return null;
+  }
+  sync(forceFull=false){
     if(this.pending)return this.pending;
     const syncScope=this.store.identity,syncEpoch=this.store.epoch;
     this.syncing=true;this.status='syncing';
     this.pending=(async()=>{
+      if(!this.store.identity&&typeof this.store.refreshQuota==='function'){
+        try{await this.store.refreshQuota();}catch{}
+      }
       const scope=this.store.identity,epoch=this.store.epoch;if(!scope)return;
       const current=()=>scope===this.store.identity&&epoch===this.store.epoch;
-      const conversations=await this.store.listConversations(true);let missing=0;
+      let missing=0;
+
+      const shouldFull=forceFull||!this.initialSynced;
+      if(shouldFull){
+        this.initialSynced=true;
+        const allIds=this.getLocalIds();
+        for(const id of allIds){
+          if(!current())return;
+          const file=this.ledger.file(scope,id);
+          if(!forceFull&&existsSync(file))continue;
+          try{
+            const raw=await this.fetchRaw(id);
+            if(!current())return;
+            if(raw)await this.ingest(scope,id,raw);
+          }catch{missing++;}
+        }
+      }
+
+      const conversations=await this.store.listConversations(true);
       for(const c of conversations){
         if(!current())return;
         const key=scope+':'+c.id,mark=c.modifiedAt+':'+c.status;
@@ -116,7 +177,7 @@ export class DesktopUsage{
   }
   async snapshot(){
     if(!this.store.identity)return null;
-    if(this.scope!==this.store.identity){this.scope=this.store.identity;this.lastSync=0;this.status='waiting';this.missingConversations=0;}
+    if(this.scope!==this.store.identity){this.scope=this.store.identity;this.lastSync=0;this.status='waiting';this.missingConversations=0;this.initialSynced=false;}
     if(Date.now()-this.lastSync>60000)void this.sync();
     const scope=this.store.identity,value=await this.ledger.summary(scope);
     return scope===this.store.identity?{...value,syncing:this.syncing,status:this.status,missingConversations:this.missingConversations,persistenceError:this.store.usagePersistenceError===true}:null;
