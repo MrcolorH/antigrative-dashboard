@@ -111,3 +111,29 @@ export async function discoverProcesses({ platform = process.platform, run = exe
   }
   throw new Error('Supported platforms: Windows, Linux, macOS');
 }
+
+export async function readHubFiles(daemonDir, { readdir: readDir = readdir, readFile: readFileContent = readFile } = {}) {
+  try {
+    const entries = await readDir(daemonDir);
+    const hubs = [];
+    for (const name of entries) {
+      if (!/^hub_\d+\.json$/.test(name)) continue;
+      try {
+        const text = await readFileContent(join(daemonDir, name), 'utf8');
+        const parsed = JSON.parse(text.replace(/^\uFEFF/, ''));
+        if (Number.isSafeInteger(parsed?.pid) && parsed.pid > 0 && typeof parsed?.csrfToken === 'string' && parsed.csrfToken.trim()) {
+          hubs.push({
+            pid: parsed.pid,
+            port: Number(parsed.httpPort) || null,
+            httpsPort: Number(parsed.httpsPort) || null,
+            csrf: parsed.csrfToken.trim(),
+            version: parsed.lsVersion || null,
+          });
+        }
+      } catch {}
+    }
+    return hubs;
+  } catch {
+    return [];
+  }
+}

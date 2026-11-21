@@ -1,24 +1,34 @@
 import { readFile } from 'node:fs/promises';
 import { request } from 'node:http';
+import { homedir } from 'node:os';
+import { join } from 'node:path';
 import { platformPaths } from '../../compat/platform.mjs';
-import { discoverProcesses } from './discovery.mjs';
+import { discoverProcesses, readHubFiles } from './discovery.mjs';
 import { TrajectoryJson } from './trajectory-json.mjs';
 import { TrajectoryReader } from './trajectory-reader.mjs';
 
 const SERVICE = '/exa.language_server_pb.LanguageServerService/';
-export function serverFromDiscovery(log, processes) {
+export function serverFromDiscovery(log, processes, { hubs = [] } = {}) {
   const rows = (Array.isArray(processes) ? processes : [processes]).filter(p => /--standalone\b/.test(p.CommandLine || ''));
   if (rows.length !== 1) throw new Error(rows.length ? '检测到多个 Antigravity 实例，请保留一个' : '未找到 Antigravity 桌面后台');
   const ports = new Set([rows[0].Ports].flat().map(Number));
-  const port = [...log.matchAll(/listening on random port at (\d+) for HTTP(?:\s|$)/g)].reverse().map(m=>Number(m[1])).find(p=>ports.has(p));
+  const pid = rows[0].ProcessId;
+  const hub = hubs.find(h => h && h.pid === pid && (ports.has(h.port) || !h.port))
+    || hubs.find(h => h && h.pid === pid);
+  let port = [...log.matchAll(/listening on random port at (\d+) for HTTP(?:\s|$)/g)].reverse().map(m=>Number(m[1])).find(p=>ports.has(p));
+  if (!port && hub && ports.has(hub.port)) {
+    port = hub.port;
+  }
   if (!port) throw new Error('等待 Antigravity 本地接口启动');
-  const csrf = rows[0].CommandLine.match(/--csrf_token(?:=|\s+)"?([^\s"]+)/)?.[1];
+  const csrf = rows[0].CommandLine.match(/--csrf_token(?:=|\s+)"?([^\s"]+)/)?.[1]
+    || (hub && (hub.port === port || !hub.port) ? hub.csrf : null)
+    || hubs.find(h => h && h.port === port && ports.has(port))?.csrf;
   if (!csrf) throw new Error('当前版本未提供可用的本地检测凭据');
-  return {port,csrf,pid:rows[0].ProcessId};
+  return {port,csrf,pid};
 }
 export class AntigravityClient {
-  constructor({paths=platformPaths,readLog=readFile,processes=discoverProcesses,now=Date.now,onRpc=null}={}) {
-    this.paths=paths;this.readLog=readLog;this.processes=processes;this.now=now;this.onRpc=onRpc;this.reader=new TrajectoryReader(this);
+  constructor({paths=platformPaths,readLog=readFile,processes=discoverProcesses,readHubs=readHubFiles,now=Date.now,onRpc=null}={}) {
+    this.paths=paths;this.readLog=readLog;this.processes=processes;this.readHubs=readHubs;this.now=now;this.onRpc=onRpc;this.reader=new TrajectoryReader(this);
   }
   server = null;
   discoveredAt = 0;
@@ -49,16 +59,34 @@ export class AntigravityClient {
     // the current standalone process credential instead of mixing generations.
     const parsed = await this.processes();
     if (!parsed || Array.isArray(parsed) && !parsed.length) throw new Error('请先打开 Antigravity');
+    const rows = (Array.isArray(parsed) ? parsed : [parsed]).filter(p => /--standalone\b/.test(p?.CommandLine || ''));
+    const paths = this.paths();
+    let hubs = [];
+    if (this.readHubs && rows.length === 1) {
+      const appData = rows[0].CommandLine?.match(/--app_data_dir(?:=|\s+)"?([^\s"]+)/)?.[1] || 'antigravity';
+      const daemonDir = paths.daemonDir || join(paths.home || homedir(), '.gemini', appData, 'daemon');
+      hubs = await this.readHubs(daemonDir).catch(() => []);
+    }
     // Credentials stay in process memory. They are never logged, persisted, or
     // returned to a browser; all calls go exclusively to 127.0.0.1.
     let foundLog=false,lastError=null;
-    const paths=this.paths();
     for(const file of paths.logCandidates||[paths.log]) {
       try {
         const log=await this.readLog(file,'utf8');foundLog=true;
-        this.server=serverFromDiscovery(log,parsed);break;
+        this.server=serverFromDiscovery(log,parsed,{hubs});break;
       } catch(error) {
         if(error.code!=='ENOENT'&&error.code!=='ENOTDIR')lastError=error;
+      }
+    }
+    if(!this.server && !foundLog && rows.length === 1) {
+      const matchingPorts = new Set([rows[0].Ports].flat().map(Number));
+      const matchingHub = hubs.find(h => h && h.pid === rows[0].ProcessId && matchingPorts.has(h.port));
+      if(matchingHub) {
+        try {
+          this.server = serverFromDiscovery('', parsed, { hubs: [matchingHub] });
+        } catch (error) {
+          if (!lastError) lastError = error;
+        }
       }
     }
     if(!this.server)throw lastError||new Error(foundLog?'等待 Antigravity 本地接口启动':'未找到 Antigravity 语言服务日志，请检查日志路径');

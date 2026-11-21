@@ -49,6 +49,9 @@ test('macOS/Linux fixtures keep UID and PID lineage rather than newest process',
 test('IDE client keeps credentials in memory and uses the selected main PID',async()=>{
  const client=new IdeClient({profile:'fixture',debugPort:()=>9000,processes:async()=>({...rows[1],Ports:[8000]}),logPort:async()=>8000});
  assert.deepEqual(await client.discover(),{port:8000,csrf:'test-only',pid:20});
+ const modernRow={ProcessId:20,ParentProcessId:10,Name:'language_server_windows_x64.exe',CommandLine:'LS --subclient_type ide',Ports:[8000]};
+ const modernClient=new IdeClient({profile:'fixture',debugPort:()=>9000,processes:async()=>modernRow,logPort:async()=>8000,readHubs:async()=>[{pid:20,port:8000,csrf:'hub-ide-token'}]});
+ assert.deepEqual(await modernClient.discover(),{port:8000,csrf:'hub-ide-token',pid:20});
 });
 
 test('inherited sockets never replace the IDE root with its Electron helper or language server',()=>{

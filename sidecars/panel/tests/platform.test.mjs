@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { platformPaths,agentExecutables } from '../../../compat/platform.mjs';
-import { parsePs,parseLsof,parseProcNet,parseNetstat,linuxPorts,discoverProcesses } from '../discovery.mjs';
+import { parsePs,parseLsof,parseProcNet,parseNetstat,linuxPorts,discoverProcesses,readHubFiles } from '../discovery.mjs';
 import { serverFromDiscovery,AntigravityClient } from '../client.mjs';
 import { createServer } from 'node:net';
 import { once } from 'node:events';
@@ -157,4 +157,37 @@ test('failed or foreign-PID fallback cannot turn a stale log into a usable endpo
  }});
  assert.equal(calls.length,3);assert.deepEqual(rows[0].Ports,[]);
  assert.throws(()=>serverFromDiscovery('listening on random port at 1234 for HTTP\n',rows),/接口启动/);
+});
+
+test('readHubFiles discovers hub JSON records and ignores malformed/unrelated files',async()=>{
+ const files={
+  'hub_1234.json':JSON.stringify({pid:42,httpPort:1234,httpsPort:1233,lsVersion:'2.34.0',csrfToken:'hub-secret-token'}),
+  'hub_9999.json':JSON.stringify({pid:99,httpPort:9999,csrfToken:'other-token'}),
+  'hub_broken.json':'invalid json',
+  'other.txt':'ignore',
+ };
+ const hubs=await readHubFiles('/fake/daemon',{
+  readdir:async()=>Object.keys(files),
+  readFile:async p=>{
+   const name=p.split(/[\\/]/).at(-1);
+   if(files[name])return files[name];
+   throw Object.assign(new Error('ENOENT'),{code:'ENOENT'});
+  },
+ });
+ assert.equal(hubs.length,2);
+ const hub42=hubs.find(h=>h.pid===42);
+ assert.ok(hub42);assert.equal(hub42.port,1234);assert.equal(hub42.httpsPort,1233);assert.equal(hub42.csrf,'hub-secret-token');assert.equal(hub42.version,'2.34.0');
+});
+
+test('discovery pairs credential from hub when modern Antigravity omits --csrf_token in args',async()=>{
+ const rows=[{ProcessId:42,CommandLine:'/bin/language_server --standalone --subclient_type hub --override_ide_version 2.34.0',Ports:[1234,1233]}];
+ const hubs=[{pid:42,port:1234,httpsPort:1233,csrf:'modern-csrf-from-daemon'}];
+ const client=new AntigravityClient({
+  paths:()=>({logCandidates:['/fake.log'],daemonDir:'/fake/daemon'}),
+  readLog:async()=>'listening on random port at 1234 for HTTP\n',
+  processes:async()=>rows,
+  readHubs:async()=>hubs,
+ });
+ const server=await client.discover();
+ assert.deepEqual(server,{port:1234,pid:42,csrf:'modern-csrf-from-daemon'});
 });

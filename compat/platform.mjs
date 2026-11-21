@@ -20,7 +20,9 @@ export function platformPaths({ platform = process.platform, home = homedir(), e
   const profile = env.AG_PULSE_PROFILE || (typeof saved.profile === 'string' ? saved.profile : null) || join(config, 'Antigravity');
   const profileLog=join(profile,'logs','language_server.log');
   const log=env.AG_PULSE_LOG || (platform==='darwin'?join(home,'Library','Logs','Antigravity','language_server.log'):profileLog);
+  const daemonDir=env.AG_PULSE_DAEMON_DIR || join(home, '.gemini', 'antigravity', 'daemon');
   return {
+    home, daemonDir,
     profile, log, logCandidates:env.AG_PULSE_LOG?[log]:[...new Set([log,profileLog,...(platform==='win32'?[join(home,'.gemini','antigravity','logs','language_server.log')]:[])])],
     settings,
     pluginConfig: join(home, '.gemini', 'config', 'config.json'),

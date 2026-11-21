@@ -1,25 +1,12 @@
 # Changelog
 
-## Unreleased — compact context card
+## 0.8.7 — 2026-11-22
 
-- Focus the context card on host occupancy, used/total tokens, sampled model and shared quota/reset controls, with language switching retained at the bottom.
-- Remove duplicate capacity rows, unknown compaction thresholds, logged-text diagnostic breakdowns and routine explanatory paragraphs from the compact UI. Preserve the host denominator and conservative diagnostic data, with detailed sources/limits documented separately.
-
-## Unreleased — compact token card
-
-- Remove repeated inequality prefixes, calculation prose and coverage-count paragraphs from the token/cache card and inline strip.
-- Keep independently measured token counters, missing-value dashes, zero-input cache semantics and conservative coverage flags unchanged. Document the partial-data limits in the README rather than expanding the compact card.
-
-
-## Unreleased — PR #15 follow-up
-
-- Preserve host-based context occupancy and the validated PR #14 capacity/reference semantics.
-- Add a separate, collapsible recorded-text estimate for App/IDE, grouped by user text, replies/thinking, tool output and system text. Compaction markers/image steps use explicit supported types; they do not invent current-context contents or a compaction trigger.
-- Filter undo/rewind and stale branches using explicit step indexes and current type/timestamp identity, including a zero-step boundary; cumulative recorded consumption remains unchanged.
-- Replace synchronous whole-file/glob collection with scoped, asynchronous incremental projection, one background job, bounded LRU numeric summaries and chunk/pass budgets. Reset on account/backend changes and detected log replacement/truncation/rewrite.
-- Strictly sanitize saved estimates; keep loading/I/O states out of measured history and keep optional failure independent of core metrics.
-- Add cross-platform resource, corruption, rewind, revision, persistence and bilingual browser regressions. No real local compaction/image-event acceptance is claimed; see `docs/CONTEXT_LIMITS.md` for coverage and limits.
-
+- Support Antigravity v2.34.0+ credential discovery: read the local CSRF token and HTTP/HTTPS ports from `~/.gemini/<app_data_dir>/daemon/hub_*.json` when the host omits `--csrf_token` from `language_server` command-line arguments. Maintain full backwards compatibility with legacy CLI flags and older releases.
+- Add daemon Hub discovery to both desktop sidecar panel and Antigravity IDE adapter with PID/port correlation and tests.
+- Compact context card: focus on host occupancy, used/total tokens, sampled model and shared quota/reset controls, with language switching retained at the bottom.
+- Compact token card: remove repeated inequality prefixes, calculation prose and redundant coverage paragraphs from the token/cache card and inline strip.
+- Recorded-text estimate follow-up: filter rewinds and stale branches with explicit step boundaries, async projection, and strict estimate sanitization.
 
 ## 0.8.6 — 2026-10-14
 
